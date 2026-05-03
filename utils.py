@@ -277,11 +277,9 @@ section[data-testid="stSidebar"] > div:first-child {{
 .er-alert-row {{ padding: 0.4rem 1.2rem; font-size: 0.8rem; color: {c['text_dim']}; }}
 
 /* Navegação — radio transformado em menu */
-/* Oculta o label "nav" que aparece acima das opções */
-[data-testid="stSidebar"] .stRadio > label,
-[data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"],
-[data-testid="stSidebar"] .stRadio p {{ display: none !important; }}
-[data-testid="stSidebar"] .stRadio > label {{ display: none !important; }}
+/* Oculta APENAS o label "nav" acima do grupo — sem esconder o texto das opções */
+[data-testid="stSidebar"] .stRadio > div:first-of-type > label {{ display: none !important; }}
+[data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"] {{ display: none !important; }}
 [data-testid="stSidebar"] .stRadio > div {{ flex-direction: column !important; gap: 1px !important; padding: 0 0.6rem !important; }}
 [data-testid="stSidebar"] .stRadio label {{
     display: flex !important; align-items: center !important;

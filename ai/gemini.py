@@ -21,10 +21,12 @@ from models import Edital, Perfil, StatusEdital
 
 logger = logging.getLogger(__name__)
 
-MODELO = "gemini-2.5-flash"
+# gemini-2.0-flash-lite tem limite de 30 req/min vs 5/min do 2.5-flash (plano gratuito)
+MODELO = "gemini-2.0-flash-lite"
 RELEVANCIA_MINIMA = 30
-PAUSA_ENTRE_CHAMADAS = 0.8
-MAX_CHARS_DESCRICAO = 3000
+PAUSA_ENTRE_CHAMADAS = 3.0   # 3s entre chamadas → máx ~20/min (seguro no free tier)
+MAX_CHARS_DESCRICAO = 2000
+MAX_EDITAIS_POR_LOTE = 10    # limita para não estourar cota em uma única busca
 
 
 # ---------------------------------------------------------------------------
@@ -140,8 +142,8 @@ Responda APENAS com um objeto JSON válido, sem texto adicional:
 # Chamada à API (novo SDK google-genai)
 # ---------------------------------------------------------------------------
 
-def _chamar_gemini(prompt: str, chave: str) -> Optional[str]:
-    """Envia prompt ao Gemini 2.5 Flash via SDK google-genai. Retorna texto ou None."""
+def _chamar_gemini(prompt: str, chave: str, tentativas: int = 3) -> Optional[str]:
+    """Envia prompt ao Gemini via SDK google-genai com retry em caso de rate limit."""
     try:
         from google import genai
         from google.genai import types
@@ -149,21 +151,35 @@ def _chamar_gemini(prompt: str, chave: str) -> Optional[str]:
         logger.error("google-genai não instalado. Execute: pip install google-genai")
         return None
 
-    try:
-        client = genai.Client(api_key=chave)
-        response = client.models.generate_content(
-            model=MODELO,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.2,
-                max_output_tokens=2048,
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
-            ),
-        )
-        return response.text
-    except Exception as exc:
-        logger.warning("Gemini: erro na chamada à API: %s", exc)
-        return None
+    client = genai.Client(api_key=chave)
+
+    for tentativa in range(1, tentativas + 1):
+        try:
+            response = client.models.generate_content(
+                model=MODELO,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.2,
+                    max_output_tokens=512,
+                ),
+            )
+            return response.text
+        except Exception as exc:
+            msg = str(exc)
+            # Rate limit (429) — espera e tenta novamente
+            if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+                espera = 60 * tentativa  # 60s, 120s, 180s
+                logger.warning(
+                    "Gemini: rate limit (tentativa %s/%s) — aguardando %ss...",
+                    tentativa, tentativas, espera,
+                )
+                time.sleep(espera)
+            else:
+                logger.warning("Gemini: erro na API: %s", exc)
+                return None
+
+    logger.error("Gemini: todas as %s tentativas esgotadas.", tentativas)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +226,14 @@ def triar_editais(
     Processa lista de editais: pontua com Gemini e descarta irrelevantes (< 30).
     Sem chave configurada retorna {"sem_chave": N} sem alterar os editais.
     """
+    # Limita o lote para não estourar a cota gratuita
+    if len(editais) > MAX_EDITAIS_POR_LOTE:
+        logger.info(
+            "Gemini: limitando triagem a %s/%s editais (cota de API).",
+            MAX_EDITAIS_POR_LOTE, len(editais),
+        )
+        editais = editais[:MAX_EDITAIS_POR_LOTE]
+
     chave = chave or _carregar_chave_env()
     contadores = {"analisados": 0, "descartados": 0, "sem_chave": 0}
 
