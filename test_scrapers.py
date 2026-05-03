@@ -186,7 +186,7 @@ def test_normalizar_resultado_sem_titulo():
     raw = {
         "href": "https://gov.br/edital",
         "title": "",
-        "body": "Texto longo que vira título quando o título está vazio",
+        "body": "Chamada pública aberta para inscrição de projetos de fomento",
     }
     campos = _normalizar_resultado(raw)
     assert campos is not None

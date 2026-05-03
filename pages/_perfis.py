@@ -106,9 +106,25 @@ def _render_form_perfil(db: Session, perfil=None) -> None:
         submitted = st.form_submit_button("Salvar perfil", use_container_width=True, type="primary")
 
     if submitted:
-        if not nome.strip():
+        nome_val = nome.strip()
+        if not nome_val:
             st.error("O nome é obrigatório.")
             return
+        if len(nome_val) > 200:
+            st.error("O nome deve ter no máximo 200 caracteres.")
+            return
+        # Verifica nome duplicado
+        todos = crud.listar_perfis(db)
+        duplicado = any(
+            p.nome.lower() == nome_val.lower()
+            for p in todos
+            if p.id != (perfil.id if perfil else None)
+        )
+        if duplicado:
+            st.warning(f"Já existe um perfil com o nome '{nome_val}'.")
+            return
+        nome = nome_val
+
         if is_novo:
             novo = crud.criar_perfil(
                 db, nome=nome.strip(), area_atuacao=area.strip(),
@@ -159,12 +175,16 @@ def _render_palavras_chave(db: Session, perfil) -> None:
     )
     if col_btn.button("Adicionar", key=f"kw_add_{perfil.id}"):
         nova = nova.strip()
-        if nova and nova not in palavras:
+        if not nova:
+            pass  # sem feedback para input vazio
+        elif len(nova) < 3:
+            st.warning("Use pelo menos 3 caracteres.")
+        elif nova.lower() in [p.lower() for p in palavras]:
+            st.warning("Palavra já cadastrada.")
+        else:
             palavras.append(nova)
             crud.atualizar_perfil(db, perfil.id, palavras_chave=palavras)
             st.rerun()
-        elif nova in palavras:
-            st.warning("Palavra já cadastrada.")
 
 
 def _render_acoes_perfil(db: Session, perfil) -> None:

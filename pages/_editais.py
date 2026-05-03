@@ -3,9 +3,19 @@
 from __future__ import annotations
 
 import io
+import os
+import re
 import csv as csv_mod
 from datetime import datetime
 from typing import Optional
+
+_PAGINA_SIZE = 20  # editais por página
+
+
+def _safe_filename(nome: str) -> str:
+    """Sanitiza nome de arquivo para evitar path traversal."""
+    nome = re.sub(r"[^\w\s\-.]", "", nome).strip()
+    return nome[:100] if nome else "arquivo"
 
 import streamlit as st
 from sqlalchemy.orm import Session
@@ -60,10 +70,11 @@ def _render_lista(db: Session, perfil_id: Optional[int]) -> None:
         data_fim=datetime.combine(data_fim, datetime.max.time()) if data_fim else None,
     )
 
+    total = len(editais)
     col_count, col_csv = st.columns([3, 1])
     col_count.markdown(
         f'<div style="color:#3d5068;font-size:0.85rem;padding:4px 0;">'
-        f'{len(editais)} resultado(s)</div>',
+        f'{total} resultado(s)</div>',
         unsafe_allow_html=True,
     )
 
@@ -80,8 +91,37 @@ def _render_lista(db: Session, perfil_id: Optional[int]) -> None:
             use_container_width=True,
         )
 
-    for edital in editais:
+    # Paginação
+    n_paginas = max(1, (total + _PAGINA_SIZE - 1) // _PAGINA_SIZE)
+    pagina_key = "editais_pagina"
+    if pagina_key not in st.session_state:
+        st.session_state[pagina_key] = 1
+
+    pg = st.session_state[pagina_key]
+    inicio = (pg - 1) * _PAGINA_SIZE
+    fim = inicio + _PAGINA_SIZE
+    pagina_editais = editais[inicio:fim]
+
+    for edital in pagina_editais:
         _render_card_edital(db, edital)
+
+    # Navegação de páginas
+    if n_paginas > 1:
+        cols_pg = st.columns([1, 2, 1])
+        with cols_pg[0]:
+            if pg > 1 and st.button("← Anterior", use_container_width=True):
+                st.session_state[pagina_key] = pg - 1
+                st.rerun()
+        with cols_pg[1]:
+            st.markdown(
+                f'<div style="text-align:center;color:#3d5068;font-size:0.85rem;padding:8px 0;">'
+                f'Página {pg} de {n_paginas}</div>',
+                unsafe_allow_html=True,
+            )
+        with cols_pg[2]:
+            if pg < n_paginas and st.button("Próxima →", use_container_width=True):
+                st.session_state[pagina_key] = pg + 1
+                st.rerun()
 
 
 def _gerar_csv(editais: list[Edital]) -> bytes:
@@ -182,12 +222,16 @@ def _render_documentos_edital(db: Session, edital: Edital) -> None:
             if nome_doc.strip():
                 arquivo_path = ""
                 if arquivo:
-                    import os
                     os.makedirs("uploads", exist_ok=True)
-                    caminho = os.path.join("uploads", arquivo.name)
-                    with open(caminho, "wb") as f:
-                        f.write(arquivo.read())
-                    arquivo_path = caminho
+                    nome_seguro = _safe_filename(arquivo.name)
+                    caminho = os.path.join("uploads", nome_seguro)
+                    try:
+                        with open(caminho, "wb") as f:
+                            f.write(arquivo.read())
+                        arquivo_path = caminho
+                    except OSError as exc:
+                        st.error(f"Erro ao salvar arquivo: {exc}")
+                        arquivo_path = ""
                 tipo_map = {"exigido": TipoDocumento.EXIGIDO, "enviado": TipoDocumento.ENVIADO, "interno": TipoDocumento.INTERNO}
                 crud.criar_documento(db, edital.id, nome_doc.strip(), tipo=tipo_map[tipo_doc], arquivo_path=arquivo_path)
                 st.rerun()
@@ -229,7 +273,7 @@ def _render_acoes_edital(db: Session, edital: Edital) -> None:
                 st.success(f"Relevância: {resultado['relevancia']}/100 — {resultado['motivo'][:120]}")
                 st.rerun()
             else:
-                st.error("Falha na análise.")
+                st.error("Falha na análise com IA. Verifique a chave em Configurações → Gemini AI.")
 
     # Excluir
     with st.expander("Excluir edital"):

@@ -148,11 +148,17 @@ def _render_upload(db: Session, edital_id: int) -> None:
                 return
             arquivo_path = ""
             if arquivo:
+                import re as _re
+                nome_seguro = _re.sub(r"[^\w\s\-.]", "", arquivo.name).strip()[:100] or "arquivo"
                 os.makedirs(_UPLOAD_DIR, exist_ok=True)
-                caminho = os.path.join(_UPLOAD_DIR, arquivo.name)
-                with open(caminho, "wb") as f:
-                    f.write(arquivo.read())
-                arquivo_path = caminho
+                caminho = os.path.join(_UPLOAD_DIR, nome_seguro)
+                try:
+                    with open(caminho, "wb") as f:
+                        f.write(arquivo.read())
+                    arquivo_path = caminho
+                except OSError as exc:
+                    st.error(f"Erro ao salvar: {exc}")
+                    arquivo_path = ""
             tipo_map = {"exigido": TipoDocumento.EXIGIDO, "enviado": TipoDocumento.ENVIADO, "interno": TipoDocumento.INTERNO}
             crud.criar_documento(db, edital_id, nome.strip(), tipo=tipo_map[tipo], arquivo_path=arquivo_path, observacoes=obs.strip())
             st.rerun()

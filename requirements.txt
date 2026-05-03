@@ -4,7 +4,7 @@ sqlalchemy==2.0.36
 
 # ── Scrapers ──────────────────────────────────────────────────────────────────
 requests==2.32.3
-duckduckgo-search==8.1.1
+ddgs>=1.0.0                  # novo nome do duckduckgo-search
 
 # ── IA ────────────────────────────────────────────────────────────────────────
 google-genai>=1.0.0          # SDK oficial Gemini (substitui google-generativeai)

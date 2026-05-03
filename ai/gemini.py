@@ -1,5 +1,5 @@
 """
-Triagem de editais via Gemini 2.5 Flash (google-genai SDK).
+Triagem de editais via Gemini (google-genai SDK).
 Analisa relevância, gera resumo e tags para cada edital novo.
 Opera em modo degradado quando a chave não está configurada.
 """
@@ -21,12 +21,12 @@ from models import Edital, Perfil, StatusEdital
 
 logger = logging.getLogger(__name__)
 
-# gemini-2.0-flash-lite tem limite de 30 req/min vs 5/min do 2.5-flash (plano gratuito)
-MODELO = "gemini-2.0-flash-lite"
+# gemini-2.5-flash-lite: modelo mais recente, raciocínio melhorado, free tier generoso
+MODELO = "gemini-2.5-flash-lite"
 RELEVANCIA_MINIMA = 30
-PAUSA_ENTRE_CHAMADAS = 3.0   # 3s entre chamadas → máx ~20/min (seguro no free tier)
-MAX_CHARS_DESCRICAO = 2000
-MAX_EDITAIS_POR_LOTE = 10    # limita para não estourar cota em uma única busca
+PAUSA_ENTRE_CHAMADAS = 2.0   # 2s entre chamadas → ~30/min (seguro no free tier)
+MAX_CHARS_DESCRICAO = 1500
+MAX_EDITAIS_POR_LOTE = 10
 
 
 # ---------------------------------------------------------------------------
@@ -34,11 +34,7 @@ MAX_EDITAIS_POR_LOTE = 10    # limita para não estourar cota em uma única busc
 # ---------------------------------------------------------------------------
 
 def _carregar_chave_env() -> Optional[str]:
-    """
-    Lê GEMINI_API_KEY de:
-      1. Variável de ambiente
-      2. Arquivo .env na raiz do projeto
-    """
+    """Lê GEMINI_API_KEY da variável de ambiente ou do arquivo .env."""
     chave = os.environ.get("GEMINI_API_KEY", "").strip()
     if chave:
         return chave
@@ -53,13 +49,17 @@ def _carregar_chave_env() -> Optional[str]:
                     return valor.strip().strip('"').strip("'")
         except OSError as exc:
             logger.warning("Falha ao ler .env: %s", exc)
-
     return None
 
 
 def esta_configurado() -> bool:
     """Retorna True se uma chave de API do Gemini está disponível."""
     return bool(_carregar_chave_env())
+
+
+def validar_chave_formato(chave: str) -> bool:
+    """Valida o formato básico de uma chave Gemini (AIza...)."""
+    return bool(re.match(r"^AIza[0-9A-Za-z_-]{35,}$", chave.strip()))
 
 
 # ---------------------------------------------------------------------------
@@ -73,13 +73,13 @@ def _extrair_json(texto: str) -> Optional[dict]:
         return json.loads(texto)
     except json.JSONDecodeError:
         pass
-    match = re.search(r"\{.*\}", texto, re.DOTALL)
+    match = re.search(r"\{[^{}]*\}", texto, re.DOTALL)
     if match:
         try:
             return json.loads(match.group())
         except json.JSONDecodeError:
             pass
-    logger.warning("Gemini: JSON inválido na resposta: %s", texto[:200])
+    logger.debug("Gemini: JSON inválido: %s", texto[:150])
     return None
 
 
@@ -87,95 +87,90 @@ def _validar_resultado(dados: dict) -> dict:
     """Normaliza tipos e limites do dict retornado pelo modelo."""
     relevancia = dados.get("relevancia", 50)
     try:
-        relevancia = max(0, min(100, int(relevancia)))
+        relevancia = max(0, min(100, int(float(str(relevancia)))))
     except (TypeError, ValueError):
         relevancia = 50
 
     tags = dados.get("tags", [])
     if not isinstance(tags, list):
-        tags = []
-    tags = [str(t).strip() for t in tags if t][:10]
+        tags = []  # qualquer não-lista vira lista vazia
+    tags = [str(t).strip() for t in tags if t and len(str(t).strip()) > 1][:8]
 
     return {
         "relevancia": relevancia,
-        "motivo": str(dados.get("motivo", "")).strip()[:500],
+        "motivo": str(dados.get("motivo", "")).strip()[:400],
         "tags": tags,
-        "resumo_curto": str(dados.get("resumo_curto", "")).strip()[:1000],
+        "resumo_curto": str(dados.get("resumo_curto", "")).strip()[:300],
     }
 
 
 # ---------------------------------------------------------------------------
-# Prompt
+# Prompt — conciso e direto para o JSON
 # ---------------------------------------------------------------------------
 
 def _montar_prompt(edital: Edital, perfil: Perfil) -> str:
-    """Constrói o prompt de análise para o Gemini."""
     descricao = (
-        edital.descricao_completa
-        or edital.descricao_curta
-        or edital.titulo
-        or ""
+        edital.descricao_completa or edital.descricao_curta or edital.titulo or ""
     )[:MAX_CHARS_DESCRICAO]
 
     palavras = ", ".join(perfil.palavras_chave or []) or "não especificadas"
     area = perfil.area_atuacao or perfil.nome or "não especificada"
 
-    return f"""Você é um especialista em editais e chamadas públicas brasileiras.
-
-Analise se o edital abaixo é relevante para um profissional da área de **{area}** com foco em: {palavras}.
-
-**Título:** {edital.titulo}
-**Órgão:** {edital.orgao_publicador or 'não informado'}
-**Modalidade:** {edital.modalidade or 'não informada'}
-**Descrição:** {descricao}
-
-Responda APENAS com um objeto JSON válido, sem texto adicional:
-{{
-  "relevancia": <inteiro 0-100>,
-  "motivo": "<1-2 frases explicando a relevância>",
-  "tags": ["<tag1>", "<tag2>", "<tag3>"],
-  "resumo_curto": "<resumo em até 200 caracteres>"
-}}"""
+    return (
+        f"Avalie a relevância deste edital para um profissional de '{area}' "
+        f"com foco em: {palavras}.\n\n"
+        f"Título: {edital.titulo}\n"
+        f"Órgão: {edital.orgao_publicador or 'não informado'}\n"
+        f"Descrição: {descricao}\n\n"
+        "Responda SOMENTE com JSON válido (sem explicações, sem markdown):\n"
+        '{"relevancia":0,"motivo":"string","tags":["tag"],"resumo_curto":"string"}\n\n'
+        "- relevancia: inteiro de 0 a 100 (0=sem relação, 100=totalmente relevante)\n"
+        "- motivo: 1 frase explicando\n"
+        "- tags: até 5 palavras-chave do edital\n"
+        "- resumo_curto: resumo em até 150 caracteres"
+    )
 
 
 # ---------------------------------------------------------------------------
-# Chamada à API (novo SDK google-genai)
+# Chamada à API com retry
 # ---------------------------------------------------------------------------
 
 def _chamar_gemini(prompt: str, chave: str, tentativas: int = 3) -> Optional[str]:
-    """Envia prompt ao Gemini via SDK google-genai com retry em caso de rate limit."""
+    """Chama a API Gemini com retry automático em caso de rate limit (429)."""
     try:
         from google import genai
         from google.genai import types
     except ImportError:
-        logger.error("google-genai não instalado. Execute: pip install google-genai")
+        logger.error("google-genai não instalado: pip install google-genai")
         return None
 
     client = genai.Client(api_key=chave)
 
     for tentativa in range(1, tentativas + 1):
         try:
-            response = client.models.generate_content(
+            resp = client.models.generate_content(
                 model=MODELO,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=0.2,
-                    max_output_tokens=512,
+                    temperature=0.1,
+                    max_output_tokens=300,
                 ),
             )
-            return response.text
+            texto = resp.text or ""
+            if texto.strip():
+                return texto
+            logger.warning("Gemini: resposta vazia (tentativa %s)", tentativa)
         except Exception as exc:
             msg = str(exc)
-            # Rate limit (429) — espera e tenta novamente
             if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
-                espera = 60 * tentativa  # 60s, 120s, 180s
+                espera = 60 * tentativa
                 logger.warning(
-                    "Gemini: rate limit (tentativa %s/%s) — aguardando %ss...",
+                    "Gemini: rate limit (tentativa %s/%s) — aguardando %ss",
                     tentativa, tentativas, espera,
                 )
                 time.sleep(espera)
             else:
-                logger.warning("Gemini: erro na API: %s", exc)
+                logger.warning("Gemini: erro na API: %.200s", msg)
                 return None
 
     logger.error("Gemini: todas as %s tentativas esgotadas.", tentativas)
@@ -183,7 +178,7 @@ def _chamar_gemini(prompt: str, chave: str, tentativas: int = 3) -> Optional[str
 
 
 # ---------------------------------------------------------------------------
-# Análise de um único edital
+# Análise individual
 # ---------------------------------------------------------------------------
 
 def analisar_edital(
@@ -192,12 +187,11 @@ def analisar_edital(
     chave: Optional[str] = None,
 ) -> Optional[dict]:
     """
-    Analisa relevância de um edital para o perfil via Gemini 2.5 Flash.
+    Analisa relevância de um edital para o perfil.
     Retorna dict {relevancia, motivo, tags, resumo_curto} ou None em caso de falha.
     """
     chave = chave or _carregar_chave_env()
     if not chave:
-        logger.debug("Gemini: chave não configurada.")
         return None
 
     prompt = _montar_prompt(edital, perfil)
@@ -207,6 +201,7 @@ def analisar_edital(
 
     dados = _extrair_json(texto)
     if not dados:
+        logger.debug("Gemini: resposta não parseável para id=%s: %s", edital.id, texto[:100])
         return None
 
     return _validar_resultado(dados)
@@ -223,13 +218,12 @@ def triar_editais(
     chave: Optional[str] = None,
 ) -> dict[str, int]:
     """
-    Processa lista de editais: pontua com Gemini e descarta irrelevantes (< 30).
-    Sem chave configurada retorna {"sem_chave": N} sem alterar os editais.
+    Processa lista de editais: pontua com Gemini e descarta os irrelevantes (< 30).
+    Sem chave configurada, retorna {"sem_chave": N} sem alterar editais.
     """
-    # Limita o lote para não estourar a cota gratuita
     if len(editais) > MAX_EDITAIS_POR_LOTE:
         logger.info(
-            "Gemini: limitando triagem a %s/%s editais (cota de API).",
+            "Gemini: limitando triagem a %s/%s editais (cota).",
             MAX_EDITAIS_POR_LOTE, len(editais),
         )
         editais = editais[:MAX_EDITAIS_POR_LOTE]
@@ -246,7 +240,6 @@ def triar_editais(
         resultado = analisar_edital(edital, perfil, chave=chave)
 
         if resultado is None:
-            logger.warning("Gemini: sem resultado para edital id=%s", edital.id)
             time.sleep(PAUSA_ENTRE_CHAMADAS)
             continue
 
@@ -260,8 +253,7 @@ def triar_editais(
             contadores["descartados"] += 1
 
         crud.atualizar_edital(
-            db,
-            edital.id,
+            db, edital.id,
             relevancia_score=resultado["relevancia"],
             tags=resultado["tags"],
             descricao_curta=resultado["resumo_curto"] or edital.descricao_curta,
@@ -273,7 +265,7 @@ def triar_editais(
             status=novo_status,
         )
         logger.info(
-            "Gemini: edital id=%s relevancia=%s status=%s",
+            "Gemini: id=%s relevancia=%s status=%s",
             edital.id, resultado["relevancia"], novo_status,
         )
         time.sleep(PAUSA_ENTRE_CHAMADAS)
@@ -295,7 +287,7 @@ def reanalisar_edital(
     perfil: Perfil,
     chave: Optional[str] = None,
 ) -> Optional[dict]:
-    """Re-executa a análise Gemini para um edital existente e atualiza o banco."""
+    """Re-executa análise Gemini para um edital existente e atualiza o banco."""
     edital = crud.obter_edital(db, edital_id)
     if edital is None:
         return None

@@ -118,7 +118,7 @@ def _inferir_fonte(url: str) -> str:
     for sufixo, nome in mapa.items():
         if sufixo in d:
             return nome
-    return "Web"
+    return "DuckDuckGo"
 
 
 def _normalizar_resultado(resultado: dict) -> Optional[dict]:

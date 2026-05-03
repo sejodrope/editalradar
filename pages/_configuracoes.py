@@ -62,13 +62,16 @@ def _render_gemini() -> None:
     with st.form("form_gemini"):
         nova_chave = st.text_input("Chave de API do Gemini", type="password", placeholder="AIza...")
         if st.form_submit_button("Salvar chave", use_container_width=True, type="primary"):
+            from ai.gemini import validar_chave_formato
             nova_chave = nova_chave.strip()
             if not nova_chave:
                 st.error("Digite uma chave válida.")
+            elif not validar_chave_formato(nova_chave):
+                st.error("Formato inválido. A chave deve começar com 'AIza' e ter pelo menos 39 caracteres.")
             else:
                 _salvar_env("GEMINI_API_KEY", nova_chave)
                 os.environ["GEMINI_API_KEY"] = nova_chave
-                st.success("Chave salva. A triagem por IA será ativada na próxima busca.")
+                st.success("Chave salva. Modelo: Gemini 2.5 Flash Lite — triagem ativada.")
                 st.rerun()
 
     if configurado:
