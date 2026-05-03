@@ -277,6 +277,10 @@ section[data-testid="stSidebar"] > div:first-child {{
 .er-alert-row {{ padding: 0.4rem 1.2rem; font-size: 0.8rem; color: {c['text_dim']}; }}
 
 /* Navegação — radio transformado em menu */
+/* Oculta o label "nav" que aparece acima das opções */
+[data-testid="stSidebar"] .stRadio > label,
+[data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"],
+[data-testid="stSidebar"] .stRadio p {{ display: none !important; }}
 [data-testid="stSidebar"] .stRadio > label {{ display: none !important; }}
 [data-testid="stSidebar"] .stRadio > div {{ flex-direction: column !important; gap: 1px !important; padding: 0 0.6rem !important; }}
 [data-testid="stSidebar"] .stRadio label {{
@@ -508,7 +512,7 @@ def fmt_valor(v: Optional[float]) -> str:
 def dias_restantes(dt: Optional[datetime]) -> Optional[int]:
     if not dt:
         return None
-    return (dt.replace(tzinfo=None) - datetime.utcnow()).days
+    return (dt.replace(tzinfo=None) - datetime.now()).days
 
 
 def fmt_prazo(dt: Optional[datetime]) -> str:

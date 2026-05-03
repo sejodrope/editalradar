@@ -40,7 +40,7 @@ def test_job_busca_editais_sem_perfis():
     """Com todos os perfis já buscados recentemente, não deve executar nada."""
     db, perfil = _setup()
     # Marca ultima_busca_em = agora → perfil não precisa de busca
-    crud.atualizar_config_busca(db, perfil.id, ultima_busca_em=datetime.utcnow())
+    crud.atualizar_config_busca(db, perfil.id, ultima_busca_em=datetime.now())
     db.close()
 
     with patch("models.get_session", return_value=get_session(":memory:")):
@@ -115,7 +115,7 @@ def test_job_gerar_alertas():
         titulo="Edital com prazo próximo",
         fonte="PNCP",
         url_original="https://test.gov.br/1",
-        data_encerramento=datetime.utcnow() + timedelta(days=2),
+        data_encerramento=datetime.now() + timedelta(days=2),
     )
 
     with patch("models.get_session", return_value=db):

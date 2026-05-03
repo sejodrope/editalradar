@@ -75,7 +75,7 @@ def atualizar_perfil(
     for campo, valor in campos.items():
         if campo in campos_permitidos:
             setattr(perfil, campo, valor)
-    perfil.atualizado_em = datetime.utcnow()
+    perfil.atualizado_em = datetime.now()
     db.commit()
     db.refresh(perfil)
     return perfil
@@ -200,7 +200,7 @@ def atualizar_edital(db: Session, edital_id: int, **campos) -> Optional[Edital]:
     for campo, valor in campos.items():
         if campo in campos_permitidos:
             setattr(edital, campo, valor)
-    edital.atualizado_em = datetime.utcnow()
+    edital.atualizado_em = datetime.now()
     db.commit()
     db.refresh(edital)
     return edital
@@ -226,7 +226,7 @@ def limpar_descartados_antigos(db: Session, dias: int = 90) -> int:
     Remove editais com status 'descartado' mais antigos que `dias` dias.
     Retorna a quantidade de registros removidos.
     """
-    limite = datetime.utcnow() - timedelta(days=dias)
+    limite = datetime.now() - timedelta(days=dias)
     editais = (
         db.query(Edital)
         .filter(Edital.status == StatusEdital.DESCARTADO, Edital.atualizado_em < limite)
@@ -254,7 +254,7 @@ def contar_editais_ativos(db: Session, perfil_id: Optional[int] = None) -> int:
 
 def contar_vencendo_em_dias(db: Session, dias: int = 7, perfil_id: Optional[int] = None) -> int:
     """Conta editais ativos com encerramento nos próximos `dias` dias."""
-    agora = datetime.utcnow()
+    agora = datetime.now()
     limite = agora + timedelta(days=dias)
     status_ativos = [StatusEdital.NOVO, StatusEdital.EM_ANALISE, StatusEdital.INTERESSANTE, StatusEdital.INSCRITO]
     q = (
@@ -272,7 +272,7 @@ def contar_vencendo_em_dias(db: Session, dias: int = 7, perfil_id: Optional[int]
 
 def contar_novos_hoje(db: Session, perfil_id: Optional[int] = None) -> int:
     """Conta editais criados hoje."""
-    hoje = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     q = db.query(func.count(Edital.id)).filter(Edital.criado_em >= hoje)
     if perfil_id:
         q = q.filter(Edital.perfil_id == perfil_id)
@@ -281,7 +281,7 @@ def contar_novos_hoje(db: Session, perfil_id: Optional[int] = None) -> int:
 
 def editais_proximos_30_dias(db: Session, perfil_id: Optional[int] = None) -> list[Edital]:
     """Retorna editais com encerramento nos próximos 30 dias, para a timeline."""
-    agora = datetime.utcnow()
+    agora = datetime.now()
     limite = agora + timedelta(days=30)
     q = (
         db.query(Edital)
@@ -358,7 +358,7 @@ def marcar_documento_enviado(db: Session, doc_id: int) -> Optional[Documento]:
     return atualizar_documento(
         db, doc_id,
         status=StatusDocumento.ENVIADO,
-        data_envio=datetime.utcnow(),
+        data_envio=datetime.now(),
     )
 
 
@@ -440,7 +440,7 @@ def gerar_alertas_prazo(db: Session) -> int:
     Deve ser chamado pelo scheduler periodicamente.
     Retorna o número de novos alertas criados.
     """
-    agora = datetime.utcnow()
+    agora = datetime.now()
     status_ativos = [StatusEdital.NOVO, StatusEdital.EM_ANALISE, StatusEdital.INTERESSANTE, StatusEdital.INSCRITO]
     editais = (
         db.query(Edital)
@@ -522,7 +522,7 @@ def perfis_para_buscar(db: Session) -> list[Perfil]:
     Retorna perfis cuja busca está ativa e cujo intervalo desde a última busca
     já ultrapassou a frequência configurada (ou que nunca foram buscados).
     """
-    agora = datetime.utcnow()
+    agora = datetime.now()
     configs = (
         db.query(ConfiguracaoBusca)
         .filter(ConfiguracaoBusca.ativa.is_(True))

@@ -176,9 +176,10 @@ def buscar_e_salvar_pncp(
         logger.info("PNCP: perfil '%s' sem palavras-chave, pulando.", perfil.nome)
         return []
 
-    hoje = datetime.utcnow()
-    data_inicial = (hoje - timedelta(days=dias_retroativos)).strftime("%Y%m%d")
-    data_final = hoje.strftime("%Y%m%d")
+    hoje = datetime.now()
+    # PNCP aceita formato YYYYMMDD ou YYYY-MM-DD — testamos os dois
+    data_inicial = (hoje - timedelta(days=dias_retroativos)).strftime("%Y-%m-%d")
+    data_final = hoje.strftime("%Y-%m-%d")
 
     logger.info(
         "PNCP: iniciando busca para perfil '%s' | %s → %s",

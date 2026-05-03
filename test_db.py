@@ -43,7 +43,7 @@ def run():
         url_original="https://bndes.gov.br/edital/restauracao-2025",
         orgao_publicador="BNDES",
         modalidade="Chamada Pública",
-        data_encerramento=datetime.utcnow() + timedelta(days=5),
+        data_encerramento=datetime.now() + timedelta(days=5),
         valor_total=10_000_000.0,
         relevancia_score=92,
         tags=["mata atlântica", "restauração", "fomento"],
@@ -107,7 +107,7 @@ def run():
     # 10. ConfiguracaoBusca
     config = crud.obter_config_busca(db, perfil.id)
     assert config is not None and config.frequencia_horas == 24
-    crud.atualizar_config_busca(db, perfil.id, frequencia_horas=12, ultima_busca_em=datetime.utcnow())
+    crud.atualizar_config_busca(db, perfil.id, frequencia_horas=12, ultima_busca_em=datetime.now())
     config = crud.obter_config_busca(db, perfil.id)
     assert config.frequencia_horas == 12
     print(f"[OK] ConfiguracaoBusca atualizada: freq={config.frequencia_horas}h")
@@ -121,7 +121,7 @@ def run():
     crud.mudar_status_edital(db, edital.id, StatusEdital.DESCARTADO)
     # Força a data de atualização para > 90 dias atrás
     edital_obj = crud.obter_edital(db, edital.id)
-    edital_obj.atualizado_em = datetime.utcnow() - timedelta(days=91)
+    edital_obj.atualizado_em = datetime.now() - timedelta(days=91)
     db.commit()
     removidos = crud.limpar_descartados_antigos(db, dias=90)
     assert removidos == 1

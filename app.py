@@ -39,15 +39,16 @@ def _load_env() -> None:
 
 _load_env()
 
-# ── Logging ───────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler("editalradar.log", encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
-)
+# ── Logging (configura apenas uma vez — evita ResourceWarning) ───────────
+if not logging.root.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.FileHandler("editalradar.log", encoding="utf-8"),
+            logging.StreamHandler(),
+        ],
+    )
 
 # ── Configuração da página ────────────────────────────────────────────────
 st.set_page_config(
@@ -85,7 +86,7 @@ def _executar_busca(db, perfil_unico, todos_perfis) -> None:
     with st.spinner(f"Buscando editais para {len(alvos)} perfil(is)..."):
         for perfil in alvos:
             resultado = executar_busca_completa(db, perfil)
-            cutoff = datetime.utcnow() - timedelta(minutes=10)
+            cutoff = datetime.now() - timedelta(minutes=10)
             novos = [
                 e for e in crud.listar_editais(db, perfil_id=perfil.id, status=[StatusEdital.NOVO])
                 if e.criado_em >= cutoff

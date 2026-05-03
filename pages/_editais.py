@@ -100,7 +100,7 @@ def _gerar_csv(editais: list[Edital]) -> bytes:
 def _render_card_edital(db: Session, edital: Edital) -> None:
     dias = None
     if edital.data_encerramento:
-        dias = (edital.data_encerramento.replace(tzinfo=None) - datetime.utcnow()).days
+        dias = (edital.data_encerramento.replace(tzinfo=None) - datetime.now()).days
     urgente = dias is not None and dias <= 3
 
     label_expander = (

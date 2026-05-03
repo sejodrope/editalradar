@@ -91,7 +91,7 @@ def render(db: Session, perfil_id: Optional[int] = None) -> None:
     else:
         for edital in interessantes:
             dias = (
-                (edital.data_encerramento.replace(tzinfo=None) - datetime.utcnow()).days
+                (edital.data_encerramento.replace(tzinfo=None) - datetime.now()).days
                 if edital.data_encerramento else None
             )
             urgente = dias is not None and dias <= 3
@@ -154,7 +154,7 @@ def _render_timeline(editais) -> None:
         import plotly.express as px
         import pandas as pd
 
-        hoje = datetime.utcnow().replace(hour=0, minute=0, second=0)
+        hoje = datetime.now().replace(hour=0, minute=0, second=0)
         dados = []
         for e in editais:
             prazo = e.data_encerramento.replace(tzinfo=None) if e.data_encerramento else None

@@ -35,7 +35,7 @@ def _editais_recentes(db, perfil_id: int) -> list:
     import crud
     from models import StatusEdital
 
-    cutoff = datetime.utcnow() - timedelta(minutes=_CUTOFF_MINUTOS)
+    cutoff = datetime.now() - timedelta(minutes=_CUTOFF_MINUTOS)
     todos = crud.listar_editais(db, perfil_id=perfil_id, status=[StatusEdital.NOVO])
     return [e for e in todos if e.criado_em >= cutoff]
 
