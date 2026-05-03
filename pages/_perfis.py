@@ -12,8 +12,25 @@ _FONTES = ["PNCP", "BNDES", "FINEP", "MMA", "MCTI", "ComprasGov", "DuckDuckGo"]
 
 
 def render(db: Session) -> None:
-    inject_css()
+    tema = st.session_state.get("tema", "dark")
+    inject_css(tema)
     st.markdown('<div class="er-page-heading">Perfis de Busca</div>', unsafe_allow_html=True)
+
+    # ── Explicação do que é um Perfil ─────────────────────────────────────
+    st.markdown(
+        """
+        <div class="er-alert er-alert-info" style="margin-bottom:1.2rem;">
+            <strong>O que é um Perfil?</strong><br>
+            Um Perfil define o que você busca. Configure:<br>
+            &bull; <strong>Nome</strong>: identifique o perfil (ex: <em>"Restauração Florestal"</em>)<br>
+            &bull; <strong>Área de atuação</strong>: seu campo de trabalho (ex: <em>"Meio Ambiente"</em>)<br>
+            &bull; <strong>Fontes</strong>: onde buscar editais (BNDES, PNCP, FINEP…)<br>
+            &bull; <strong>Palavras-chave</strong>: termos que o sistema usa para filtrar resultados relevantes<br>
+            Após salvar, adicione palavras-chave e clique em <strong>"Testar busca"</strong>.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     perfis = crud.listar_perfis(db)
     col_lista, col_form = st.columns([1, 2])
@@ -62,15 +79,29 @@ def _render_form_perfil(db: Session, perfil=None) -> None:
     form_key = f"form_perfil_{perfil.id if perfil else 'novo'}"
 
     with st.form(form_key):
-        nome     = st.text_input("Nome *",           value=perfil.nome if perfil else "")
-        area     = st.text_input("Área de atuação",  value=perfil.area_atuacao or "" if perfil else "")
-        descricao = st.text_area("Descrição",        value=perfil.descricao or "" if perfil else "", height=80)
+        nome = st.text_input(
+            "Nome *",
+            value=perfil.nome if perfil else "",
+            help="Nome curto que identifica este perfil, ex: 'Restauração Florestal SP'. Obrigatório.",
+        )
+        area = st.text_input(
+            "Área de atuação",
+            value=perfil.area_atuacao or "" if perfil else "",
+            help="Seu campo de trabalho ou setor, ex: 'Meio Ambiente', 'Educação', 'TI'. Usado para refinar buscas.",
+        )
+        descricao = st.text_area(
+            "Descrição",
+            value=perfil.descricao or "" if perfil else "",
+            height=80,
+            help="Descrição livre do objetivo deste perfil. Auxilia a IA a entender o contexto das buscas.",
+        )
 
         fontes_atuais = perfil.fontes_priorizadas if perfil else []
         fontes = st.multiselect(
             "Fontes priorizadas",
             options=_FONTES,
             default=[f for f in fontes_atuais if f in _FONTES],
+            help="Selecione as plataformas onde o sistema deve buscar editais. Deixe vazio para usar todas as fontes disponíveis.",
         )
         submitted = st.form_submit_button("Salvar perfil", use_container_width=True, type="primary")
 

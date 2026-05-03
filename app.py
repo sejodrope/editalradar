@@ -107,9 +107,12 @@ if "perfil_id" not in st.session_state:
     st.session_state["perfil_id"] = None
 if "pagina" not in st.session_state:
     st.session_state["pagina"] = "Dashboard"
+if "tema" not in st.session_state:
+    st.session_state["tema"] = "dark"
 
-# ── CSS global ────────────────────────────────────────────────────────────
-inject_css()
+# ── CSS global (antes da sidebar para garantir aplicação imediata) ────────
+tema_atual = st.session_state["tema"]
+inject_css(tema_atual)
 
 # ── Sidebar ───────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -185,6 +188,22 @@ with st.sidebar:
         )
         if st.button(btn_label, use_container_width=True, type="primary"):
             _executar_busca(db_sidebar, perfil_para_busca, perfis)
+
+    # Separador antes do toggle
+    st.markdown('<div style="height:0.8rem;"></div>', unsafe_allow_html=True)
+
+    # Toggle de tema
+    tema = st.session_state.get("tema", "dark")
+    icone_tema = "☀" if tema == "dark" else "☾"
+    lbl_tema = "Modo claro" if tema == "dark" else "Modo escuro"
+    if st.button(
+        f"{icone_tema}  {lbl_tema}",
+        use_container_width=True,
+        type="secondary",
+        key="btn_tema",
+    ):
+        st.session_state["tema"] = "light" if tema == "dark" else "dark"
+        st.rerun()
 
     db_sidebar.close()
 

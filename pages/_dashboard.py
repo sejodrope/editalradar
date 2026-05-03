@@ -14,7 +14,7 @@ from utils import badge_html, fmt_data, fmt_prazo, fmt_valor, inject_css, releva
 
 
 def render(db: Session, perfil_id: Optional[int] = None) -> None:
-    inject_css()
+    inject_css(st.session_state.get('tema', 'dark'))
 
     perfil = crud.obter_perfil(db, perfil_id) if perfil_id else None
     perfis_existem = bool(crud.listar_perfis(db))

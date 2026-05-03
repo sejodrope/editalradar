@@ -18,7 +18,7 @@ _LOG_PATH = Path(__file__).parent.parent / "editalradar.log"
 
 
 def render(db: Session, scheduler=None) -> None:
-    inject_css()
+    inject_css(st.session_state.get('tema', 'dark'))
     st.markdown('<div class="er-page-heading">Configurações</div>', unsafe_allow_html=True)
 
     tab_gemini, tab_busca, tab_sched, tab_logs, tab_manut = st.tabs(

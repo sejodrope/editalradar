@@ -10,10 +10,43 @@ import streamlit as st
 from models import StatusEdital
 
 # ---------------------------------------------------------------------------
-# Constantes visuais
+# Paletas de cores por tema
 # ---------------------------------------------------------------------------
 
-CORES_STATUS: dict[StatusEdital, tuple[str, str]] = {
+_TEMAS: dict[str, dict[str, str]] = {
+    "dark": {
+        "bg":         "#080d18",
+        "card":       "#0f1828",
+        "sidebar":    "#0d1322",
+        "text":       "#c8daf0",
+        "text_muted": "#4a6080",
+        "text_dim":   "#243347",
+        "border":     "rgba(255,255,255,0.06)",
+        "input_bg":   "rgba(255,255,255,0.04)",
+        "hover":      "rgba(255,255,255,0.04)",
+        "accent":     "#00c48c",
+        "accent2":    "#3b9eff",
+    },
+    "light": {
+        "bg":         "#f0f4f9",
+        "card":       "#ffffff",
+        "sidebar":    "#ffffff",
+        "text":       "#1a2535",
+        "text_muted": "#5a7090",
+        "text_dim":   "#9aabbc",
+        "border":     "rgba(0,0,0,0.08)",
+        "input_bg":   "#ffffff",
+        "hover":      "rgba(0,0,0,0.04)",
+        "accent":     "#00a87a",
+        "accent2":    "#2772d0",
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Status badges — cores para dark e light
+# ---------------------------------------------------------------------------
+
+_CORES_STATUS_DARK: dict[StatusEdital, tuple[str, str]] = {
     StatusEdital.NOVO:         ("#0d2444", "#4da9ff"),
     StatusEdital.EM_ANALISE:   ("#251540", "#b06fff"),
     StatusEdital.INTERESSANTE: ("#0d2e1e", "#00c48c"),
@@ -22,6 +55,19 @@ CORES_STATUS: dict[StatusEdital, tuple[str, str]] = {
     StatusEdital.PERDEU:       ("#2b0909", "#ff4d4d"),
     StatusEdital.DESCARTADO:   ("#1a1a1a", "#555555"),
 }
+
+_CORES_STATUS_LIGHT: dict[StatusEdital, tuple[str, str]] = {
+    StatusEdital.NOVO:         ("#ddeeff", "#1565c0"),
+    StatusEdital.EM_ANALISE:   ("#ede7ff", "#6a1e9e"),
+    StatusEdital.INTERESSANTE: ("#d8f5eb", "#006b50"),
+    StatusEdital.INSCRITO:     ("#fff3e0", "#b35c00"),
+    StatusEdital.GANHOU:       ("#d4f4e2", "#145a32"),
+    StatusEdital.PERDEU:       ("#ffe5e5", "#b71c1c"),
+    StatusEdital.DESCARTADO:   ("#eeeeee", "#555555"),
+}
+
+# Public alias keeps backwards compatibility with any code that imports it directly
+CORES_STATUS = _CORES_STATUS_DARK
 
 LABELS_STATUS: dict[StatusEdital, str] = {
     StatusEdital.NOVO:         "Novo",
@@ -33,272 +79,416 @@ LABELS_STATUS: dict[StatusEdital, str] = {
     StatusEdital.DESCARTADO:   "Descartado",
 }
 
-_CSS = """
+
+# ---------------------------------------------------------------------------
+# CSS dinâmico por tema
+# ---------------------------------------------------------------------------
+
+def _build_css(tema: str) -> str:
+    c = _TEMAS.get(tema, _TEMAS["dark"])
+    is_light = tema == "light"
+
+    # Overrides exclusivos do tema claro
+    light_overrides = f"""
+/* ════ LIGHT MODE OVERRIDES ════ */
+.stApp {{ background: {c['bg']} !important; color: {c['text']} !important; }}
+
+section[data-testid="stSidebar"] > div:first-child {{
+    background: {c['sidebar']} !important;
+    border-right: 1px solid {c['border']} !important;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.06) !important;
+}}
+
+[data-testid="collapsedControl"] {{
+    background: {c['sidebar']} !important;
+    border-right: 1px solid {c['border']} !important;
+}}
+
+[data-testid="metric-container"] {{
+    background: {c['card']} !important;
+    border: 1px solid {c['border']} !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important;
+}}
+[data-testid="metric-container"] label {{
+    color: {c['text_muted']} !important;
+}}
+[data-testid="metric-container"] [data-testid="metric-value"] {{
+    color: {c['text']} !important;
+}}
+
+[data-testid="stExpander"] {{
+    background: {c['card']} !important;
+    border: 1px solid {c['border']} !important;
+}}
+[data-testid="stExpander"] summary {{ color: {c['text_muted']} !important; }}
+[data-testid="stExpander"] summary:hover {{ color: {c['text']} !important; }}
+
+.stTabs [data-baseweb="tab-list"] {{
+    background: {c['hover']} !important;
+    border: 1px solid {c['border']} !important;
+}}
+.stTabs [data-baseweb="tab"] {{ color: {c['text_muted']} !important; }}
+.stTabs [aria-selected="true"] {{ background: rgba(0,168,122,0.1) !important; color: {c['accent']} !important; }}
+
+.stButton > button[kind="secondary"] {{
+    background: {c['card']} !important;
+    border: 1px solid {c['border']} !important;
+    color: {c['text_muted']} !important;
+}}
+.stButton > button[kind="secondary"]:hover {{
+    background: {c['hover']} !important;
+    color: {c['text']} !important;
+}}
+
+[data-testid="stSidebar"] .stButton > button[kind="secondary"] {{
+    background: {c['card']} !important;
+    border: 1px solid {c['border']} !important;
+    color: {c['text_muted']} !important;
+}}
+
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stNumberInput > div > div > input {{
+    background: {c['input_bg']} !important;
+    border: 1px solid {c['border']} !important;
+    color: {c['text']} !important;
+}}
+.stSelectbox > div > div, .stMultiSelect > div > div {{
+    background: {c['input_bg']} !important;
+    border: 1px solid {c['border']} !important;
+    color: {c['text']} !important;
+}}
+[data-testid="stSidebar"] .stSelectbox > div > div {{
+    background: {c['input_bg']} !important;
+    border: 1px solid {c['border']} !important;
+}}
+
+/* Sidebar nav hover em modo claro */
+[data-testid="stSidebar"] .stRadio label {{
+    color: {c['text_muted']} !important;
+}}
+[data-testid="stSidebar"] .stRadio label:hover {{
+    background: {c['hover']} !important;
+    color: {c['text']} !important;
+}}
+
+/* Cards de edital */
+.er-card {{
+    background: {c['card']} !important;
+    border: 1px solid {c['border']} !important;
+    border-left: 2px solid {c['accent']} !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+}}
+.er-card:hover {{ border-color: rgba(0,0,0,0.13) !important; }}
+.er-card-title {{ color: {c['text']} !important; }}
+.er-card-meta  {{ color: {c['text_muted']} !important; }}
+
+/* Textos de heading */
+.er-page-heading {{ color: {c['text']} !important; border-bottom-color: {c['border']} !important; }}
+.er-heading {{ color: {c['text_dim']} !important; }}
+.er-section {{ color: {c['text_dim']} !important; }}
+.er-logo-sub {{ color: {c['text_dim']} !important; }}
+
+/* rel-wrap */
+.rel-wrap {{ background: {c['border']} !important; }}
+
+/* tag-chip */
+.tag-chip {{
+    background: rgba(39,114,208,0.08) !important;
+    color: {c['accent2']} !important;
+    border-color: rgba(39,114,208,0.15) !important;
+}}
+
+/* hr */
+hr {{ background: {c['border']} !important; }}
+
+/* Scrollbar */
+::-webkit-scrollbar-thumb {{ background: rgba(0,0,0,0.12) !important; }}
+::-webkit-scrollbar-thumb:hover {{ background: rgba(0,0,0,0.2) !important; }}
+""" if is_light else ""
+
+    return f"""
 <style>
 /* ════════════════════════════════════════════════════
    RESET & BASE
    ════════════════════════════════════════════════════ */
 
 /* Oculta apenas o menu hamburger e rodapé — mantém o botão de reabrir sidebar */
-#MainMenu { visibility: hidden; }
-footer    { visibility: hidden; }
+#MainMenu {{ visibility: hidden; }}
+footer    {{ visibility: hidden; }}
 
 /* Botão de reabrir sidebar (seta ›) — SEMPRE visível */
-[data-testid="collapsedControl"] {
+[data-testid="collapsedControl"] {{
     visibility: visible !important;
     display: flex !important;
     opacity: 1 !important;
-    background: #131c2e !important;
-    border-right: 1px solid rgba(255,255,255,0.07) !important;
-}
+    background: {c['sidebar']} !important;
+    border-right: 1px solid {c['border']} !important;
+    transition: background 0.25s, color 0.25s;
+}}
 
 /* Oculta navegação automática do Streamlit (pages/) */
-[data-testid="stSidebarNav"] { display: none !important; }
+[data-testid="stSidebarNav"] {{ display: none !important; }}
 
 /* Layout base */
-.block-container { padding-top: 2rem; padding-bottom: 2rem; max-width: 100% !important; overflow-x: hidden !important; }
-[data-testid="column"] { min-width: 0 !important; }
-p, span, li { overflow-wrap: break-word !important; word-break: break-word !important; }
+.block-container {{ padding-top: 2rem; padding-bottom: 2rem; max-width: 100% !important; overflow-x: hidden !important; }}
+[data-testid="column"] {{ min-width: 0 !important; }}
+p, span, li {{ overflow-wrap: break-word !important; word-break: break-word !important; }}
+
+/* Smooth theme transitions */
+.stApp, section[data-testid="stSidebar"] > div:first-child,
+[data-testid="metric-container"], .er-card, .stTextInput > div > div > input,
+.stTextArea > div > div > textarea {{
+    transition: background 0.25s, color 0.25s;
+}}
 
 /* ════════════════════════════════════════════════════
-   BACKGROUND & CORES GLOBAIS
+   BACKGROUND & CORES GLOBAIS (dark base)
    ════════════════════════════════════════════════════ */
-.stApp { background: #080d18 !important; }
+.stApp {{ background: {c['bg']} !important; }}
 
 /* ════════════════════════════════════════════════════
    SIDEBAR
    ════════════════════════════════════════════════════ */
-section[data-testid="stSidebar"] > div:first-child {
-    background: #0d1322 !important;
-    border-right: 1px solid rgba(255,255,255,0.05) !important;
-}
+section[data-testid="stSidebar"] > div:first-child {{
+    background: {c['sidebar']} !important;
+    border-right: 1px solid {c['border']} !important;
+}}
 
 /* Logo */
-.er-logo { padding: 1.4rem 1.2rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 0.2rem; }
-.er-logo-text {
+.er-logo {{ padding: 1.4rem 1.2rem 1rem; border-bottom: 1px solid {c['border']}; margin-bottom: 0.2rem; }}
+.er-logo-text {{
     font-size: 1.3rem; font-weight: 800; letter-spacing: -0.3px; line-height: 1.2; display: block;
-    background: linear-gradient(135deg, #00c48c 0%, #3b9eff 100%);
+    background: linear-gradient(135deg, {c['accent']} 0%, {c['accent2']} 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-}
-.er-logo-sub { font-size: 0.65rem; color: #243347; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 4px; }
+}}
+.er-logo-sub {{ font-size: 0.65rem; color: {c['text_dim']}; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 4px; }}
 
 /* Seções da sidebar */
-.er-section { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #243347; padding: 0.9rem 1.2rem 0.3rem; }
+.er-section {{ font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: {c['text_dim']}; padding: 0.9rem 1.2rem 0.3rem; }}
 
 /* Badge de alertas */
-.er-alert-badge {
+.er-alert-badge {{
     display: inline-flex; align-items: center; justify-content: center;
     background: #b03020; color: #fff; font-size: 0.6rem; font-weight: 700;
     min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
     vertical-align: middle; margin-left: 6px;
-}
-.er-alert-row { padding: 0.4rem 1.2rem; font-size: 0.8rem; color: #3d5068; }
+}}
+.er-alert-row {{ padding: 0.4rem 1.2rem; font-size: 0.8rem; color: {c['text_dim']}; }}
 
 /* Navegação — radio transformado em menu */
-[data-testid="stSidebar"] .stRadio > label { display: none !important; }
-[data-testid="stSidebar"] .stRadio > div { flex-direction: column !important; gap: 1px !important; padding: 0 0.6rem !important; }
-[data-testid="stSidebar"] .stRadio label {
+[data-testid="stSidebar"] .stRadio > label {{ display: none !important; }}
+[data-testid="stSidebar"] .stRadio > div {{ flex-direction: column !important; gap: 1px !important; padding: 0 0.6rem !important; }}
+[data-testid="stSidebar"] .stRadio label {{
     display: flex !important; align-items: center !important;
     padding: 9px 14px !important; border-radius: 7px !important; margin: 0 !important;
     cursor: pointer !important; transition: all 0.15s !important;
-    font-size: 0.875rem !important; font-weight: 500 !important; color: #3d5470 !important;
+    font-size: 0.875rem !important; font-weight: 500 !important; color: {c['text_muted']} !important;
     width: 100% !important; letter-spacing: 0.01em !important;
-}
-[data-testid="stSidebar"] .stRadio label:hover { background: rgba(255,255,255,0.04) !important; color: #8099b8 !important; }
-[data-testid="stSidebar"] .stRadio input[type="radio"] { position: absolute !important; opacity: 0 !important; width: 0 !important; height: 0 !important; }
-[data-testid="stSidebar"] .stRadio label > div:first-child { display: none !important; }
+}}
+[data-testid="stSidebar"] .stRadio label:hover {{ background: {c['hover']} !important; color: {c['text']} !important; }}
+[data-testid="stSidebar"] .stRadio input[type="radio"] {{ position: absolute !important; opacity: 0 !important; width: 0 !important; height: 0 !important; }}
+[data-testid="stSidebar"] .stRadio label > div:first-child {{ display: none !important; }}
 
-/* Botão buscar */
-[data-testid="stSidebar"] .stButton > button {
+/* Botão buscar / tema */
+[data-testid="stSidebar"] .stButton > button {{
     border-radius: 7px !important; font-weight: 600 !important; font-size: 0.85rem !important;
     transition: all 0.18s !important; margin: 0 0.6rem !important; width: calc(100% - 1.2rem) !important;
-}
-[data-testid="stSidebar"] .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #00c48c, #0090c0) !important;
+}}
+[data-testid="stSidebar"] .stButton > button[kind="primary"] {{
+    background: linear-gradient(135deg, {c['accent']}, #0090c0) !important;
     border: none !important; color: #fff !important;
     box-shadow: 0 2px 10px rgba(0,196,140,0.2) !important;
-}
-[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
+}}
+[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {{
     box-shadow: 0 4px 18px rgba(0,196,140,0.35) !important; transform: translateY(-1px) !important;
-}
+}}
+[data-testid="stSidebar"] .stButton > button[kind="secondary"] {{
+    background: {c['input_bg']} !important; border: 1px solid {c['border']} !important; color: {c['text_muted']} !important;
+}}
+[data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {{
+    background: {c['hover']} !important; color: {c['text']} !important;
+}}
 
 /* Selectbox sidebar */
-[data-testid="stSidebar"] .stSelectbox > div > div {
-    background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.07) !important;
+[data-testid="stSidebar"] .stSelectbox > div > div {{
+    background: {c['input_bg']} !important; border: 1px solid {c['border']} !important;
     border-radius: 7px !important; font-size: 0.875rem !important;
-}
+}}
 
 /* ════════════════════════════════════════════════════
    METRIC CARDS
    ════════════════════════════════════════════════════ */
-[data-testid="metric-container"] {
-    background: #0f1828 !important;
-    border: 1px solid rgba(255,255,255,0.06) !important;
+[data-testid="metric-container"] {{
+    background: {c['card']} !important;
+    border: 1px solid {c['border']} !important;
     border-radius: 12px !important;
     padding: 1.2rem 1.4rem 1rem !important;
     position: relative !important;
     overflow: hidden !important;
-}
+}}
 /* Linha de acento no topo */
-[data-testid="metric-container"]::before {
+[data-testid="metric-container"]::before {{
     content: "" !important; position: absolute !important;
     top: 0 !important; left: 0 !important; right: 0 !important;
     height: 2px !important;
-    background: linear-gradient(90deg, #00c48c, #3b9eff) !important;
+    background: linear-gradient(90deg, {c['accent']}, {c['accent2']}) !important;
     border-radius: 12px 12px 0 0 !important;
-}
-[data-testid="metric-container"] label {
-    color: #2d4060 !important; font-size: 0.7rem !important;
+}}
+[data-testid="metric-container"] label {{
+    color: {c['text_muted']} !important; font-size: 0.7rem !important;
     font-weight: 700 !important; letter-spacing: 0.08em !important; text-transform: uppercase !important;
-}
-[data-testid="metric-container"] [data-testid="metric-value"] {
+}}
+[data-testid="metric-container"] [data-testid="metric-value"] {{
     font-size: 2.1rem !important; font-weight: 700 !important;
-    color: #c8daf0 !important; line-height: 1.1 !important;
-}
+    color: {c['text']} !important; line-height: 1.1 !important;
+}}
 
 /* ════════════════════════════════════════════════════
    EXPANDERS
    ════════════════════════════════════════════════════ */
-[data-testid="stExpander"] {
-    background: #0f1828 !important;
-    border: 1px solid rgba(255,255,255,0.06) !important;
+[data-testid="stExpander"] {{
+    background: {c['card']} !important;
+    border: 1px solid {c['border']} !important;
     border-radius: 10px !important; margin: 4px 0 !important; overflow: hidden !important;
-}
-[data-testid="stExpander"] summary {
+}}
+[data-testid="stExpander"] summary {{
     font-size: 0.9rem !important; font-weight: 600 !important;
-    color: #8099b8 !important; padding: 0.85rem 1rem !important;
-}
-[data-testid="stExpander"] summary:hover { color: #c0d4ec !important; }
+    color: {c['text_muted']} !important; padding: 0.85rem 1rem !important;
+}}
+[data-testid="stExpander"] summary:hover {{ color: {c['text']} !important; }}
 
 /* ════════════════════════════════════════════════════
    TABS
    ════════════════════════════════════════════════════ */
-.stTabs [data-baseweb="tab-list"] {
-    background: rgba(255,255,255,0.02) !important; border-radius: 9px !important;
-    padding: 3px !important; gap: 1px !important; border: 1px solid rgba(255,255,255,0.04) !important;
-}
-.stTabs [data-baseweb="tab"] {
+.stTabs [data-baseweb="tab-list"] {{
+    background: {c['input_bg']} !important; border-radius: 9px !important;
+    padding: 3px !important; gap: 1px !important; border: 1px solid {c['border']} !important;
+}}
+.stTabs [data-baseweb="tab"] {{
     border-radius: 7px !important; font-size: 0.84rem !important;
-    font-weight: 500 !important; color: #3d5068 !important; transition: all 0.18s !important;
-}
-.stTabs [aria-selected="true"] { background: rgba(0,196,140,0.1) !important; color: #00c48c !important; }
+    font-weight: 500 !important; color: {c['text_muted']} !important; transition: all 0.18s !important;
+}}
+.stTabs [aria-selected="true"] {{ background: rgba(0,196,140,0.1) !important; color: {c['accent']} !important; }}
 
 /* ════════════════════════════════════════════════════
    BOTÕES GLOBAIS
    ════════════════════════════════════════════════════ */
-.stButton > button {
+.stButton > button {{
     border-radius: 7px !important; font-weight: 600 !important;
     font-size: 0.875rem !important; transition: all 0.18s !important;
-}
-.stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #00c48c, #0090c0) !important;
+}}
+.stButton > button[kind="primary"] {{
+    background: linear-gradient(135deg, {c['accent']}, #0090c0) !important;
     border: none !important; color: #fff !important;
     box-shadow: 0 2px 10px rgba(0,196,140,0.2) !important;
-}
-.stButton > button[kind="primary"]:hover { box-shadow: 0 4px 18px rgba(0,196,140,0.35) !important; transform: translateY(-1px) !important; }
-.stButton > button[kind="secondary"] {
-    background: rgba(255,255,255,0.03) !important; border: 1px solid rgba(255,255,255,0.08) !important; color: #5070a0 !important;
-}
-.stButton > button[kind="secondary"]:hover { background: rgba(255,255,255,0.06) !important; color: #8099b8 !important; }
+}}
+.stButton > button[kind="primary"]:hover {{ box-shadow: 0 4px 18px rgba(0,196,140,0.35) !important; transform: translateY(-1px) !important; }}
+.stButton > button[kind="secondary"] {{
+    background: {c['input_bg']} !important; border: 1px solid {c['border']} !important; color: {c['text_muted']} !important;
+}}
+.stButton > button[kind="secondary"]:hover {{ background: {c['hover']} !important; color: {c['text']} !important; }}
 
 /* ════════════════════════════════════════════════════
    INPUTS
    ════════════════════════════════════════════════════ */
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea,
-.stNumberInput > div > div > input {
-    background: rgba(255,255,255,0.03) !important; border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 7px !important; color: #c0d4ec !important; transition: all 0.18s !important;
-}
+.stNumberInput > div > div > input {{
+    background: {c['input_bg']} !important; border: 1px solid {c['border']} !important;
+    border-radius: 7px !important; color: {c['text']} !important; transition: all 0.18s !important;
+}}
 .stTextInput > div > div > input:focus,
-.stTextArea > div > div > textarea:focus {
+.stTextArea > div > div > textarea:focus {{
     border-color: rgba(0,196,140,0.4) !important; box-shadow: 0 0 0 3px rgba(0,196,140,0.07) !important;
-}
-.stSelectbox > div > div, .stMultiSelect > div > div {
-    background: rgba(255,255,255,0.03) !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 7px !important;
-}
+}}
+.stSelectbox > div > div, .stMultiSelect > div > div {{
+    background: {c['input_bg']} !important; border: 1px solid {c['border']} !important; border-radius: 7px !important;
+}}
 
 /* ════════════════════════════════════════════════════
    DIVIDERS
    ════════════════════════════════════════════════════ */
-hr { border: none !important; height: 1px !important; background: rgba(255,255,255,0.05) !important; margin: 1.2rem 0 !important; }
+hr {{ border: none !important; height: 1px !important; background: {c['border']} !important; margin: 1.2rem 0 !important; }}
 
 /* ════════════════════════════════════════════════════
    ALERTS (st.info / st.success / st.warning / st.error)
    ════════════════════════════════════════════════════ */
-div[data-testid="stAlert"] { border-radius: 9px !important; font-size: 0.87rem !important; border-width: 1px !important; }
+div[data-testid="stAlert"] {{ border-radius: 9px !important; font-size: 0.87rem !important; border-width: 1px !important; }}
 
 /* ════════════════════════════════════════════════════
    SCROLLBAR
    ════════════════════════════════════════════════════ */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.13); }
+::-webkit-scrollbar {{ width: 4px; height: 4px; }}
+::-webkit-scrollbar-track {{ background: transparent; }}
+::-webkit-scrollbar-thumb {{ background: rgba(255,255,255,0.07); border-radius: 2px; }}
+::-webkit-scrollbar-thumb:hover {{ background: rgba(255,255,255,0.13); }}
 
 /* ════════════════════════════════════════════════════
    COMPONENTES CUSTOMIZADOS
    ════════════════════════════════════════════════════ */
 
 /* Títulos de página */
-.er-page-heading {
-    font-size: 1.55rem; font-weight: 700; color: #c8daf0;
+.er-page-heading {{
+    font-size: 1.55rem; font-weight: 700; color: {c['text']};
     letter-spacing: -0.3px; margin-bottom: 1.4rem;
-    padding-bottom: 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.05);
-}
+    padding-bottom: 0.9rem; border-bottom: 1px solid {c['border']};
+}}
 
 /* Sub-headings de seção */
-.er-heading {
+.er-heading {{
     font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; color: #243347; margin: 1.2rem 0 0.5rem;
-}
+    text-transform: uppercase; color: {c['text_dim']}; margin: 1.2rem 0 0.5rem;
+}}
 
 /* Cards de edital */
-.er-card {
-    background: #0f1828; border: 1px solid rgba(255,255,255,0.05);
-    border-left: 2px solid #00c48c; border-radius: 9px;
+.er-card {{
+    background: {c['card']}; border: 1px solid {c['border']};
+    border-left: 2px solid {c['accent']}; border-radius: 9px;
     padding: 13px 18px; margin: 5px 0;
     transition: border-color 0.2s;
-}
-.er-card:hover { border-color: rgba(255,255,255,0.09); }
-.er-card-urgent { border-left-color: #b03020; }
-.er-card-title { font-size: 0.93rem; font-weight: 600; color: #b8cee8; line-height: 1.4; margin-bottom: 5px; }
-.er-card-meta { font-size: 0.76rem; color: #2d4060; }
+}}
+.er-card:hover {{ border-color: {c['hover']}; }}
+.er-card-urgent {{ border-left-color: #b03020; }}
+.er-card-title {{ font-size: 0.93rem; font-weight: 600; color: {c['text']}; line-height: 1.4; margin-bottom: 5px; }}
+.er-card-meta {{ font-size: 0.76rem; color: {c['text_muted']}; }}
 
 /* Status badges */
-.badge {
+.badge {{
     display: inline-flex; align-items: center; padding: 2px 9px;
     border-radius: 20px; font-size: 0.65rem; font-weight: 700;
     letter-spacing: 0.07em; text-transform: uppercase; vertical-align: middle;
-}
+}}
 
 /* Alertas customizados */
-.er-alert { background: rgba(176,48,32,0.07); border-left: 2px solid #b03020; padding: 9px 14px; border-radius: 0 8px 8px 0; margin: 4px 0; font-size: 0.83rem; color: #a0b0c8; }
-.er-alert-warn { background: rgba(200,120,40,0.07); border-left-color: #c07830; }
-.er-alert-info { background: rgba(40,100,180,0.07); border-left-color: #2864b4; }
+.er-alert {{ background: rgba(176,48,32,0.07); border-left: 2px solid #b03020; padding: 9px 14px; border-radius: 0 8px 8px 0; margin: 4px 0; font-size: 0.83rem; color: {c['text_muted']}; }}
+.er-alert-warn {{ background: rgba(200,120,40,0.07); border-left-color: #c07830; }}
+.er-alert-info {{ background: rgba(40,100,180,0.07); border-left-color: #2864b4; }}
 
 /* Barra de relevância */
-.rel-wrap { background: rgba(255,255,255,0.05); border-radius: 3px; height: 5px; width: 100%; margin: 4px 0; overflow: hidden; }
-.rel-fill { height: 5px; border-radius: 3px; background: linear-gradient(90deg, #b03020 0%, #c07830 35%, #00c48c 65%, #00c48c 100%); }
+.rel-wrap {{ background: {c['border']}; border-radius: 3px; height: 5px; width: 100%; margin: 4px 0; overflow: hidden; }}
+.rel-fill {{ height: 5px; border-radius: 3px; background: linear-gradient(90deg, #b03020 0%, #c07830 35%, {c['accent']} 65%, {c['accent']} 100%); }}
 
 /* Tag chips */
-.tag-chip {
+.tag-chip {{
     display: inline-flex; align-items: center; background: rgba(40,100,180,0.08);
-    color: #3d6090; border: 1px solid rgba(40,100,180,0.1);
+    color: {c['accent2']}; border: 1px solid rgba(40,100,180,0.1);
     padding: 2px 9px; border-radius: 20px; font-size: 0.68rem; font-weight: 500; margin: 2px 2px;
-}
+}}
 
 /* Ponto de status (Gemini/Scheduler) */
-.er-status-dot {
+.er-status-dot {{
     display: inline-block; width: 7px; height: 7px; border-radius: 50%;
     vertical-align: middle; margin-right: 7px;
-}
+}}
+
+{light_overrides}
 </style>
 """
 
 
-def inject_css() -> None:
-    st.markdown(_CSS, unsafe_allow_html=True)
+def inject_css(tema: str = "dark") -> None:
+    st.markdown(_build_css(tema), unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -341,8 +531,9 @@ def fmt_prazo(dt: Optional[datetime]) -> str:
 # Componentes HTML
 # ---------------------------------------------------------------------------
 
-def badge_html(status: StatusEdital) -> str:
-    bg, fg = CORES_STATUS.get(status, ("#1a1a1a", "#555"))
+def badge_html(status: StatusEdital, tema: str = "dark") -> str:
+    cores = _CORES_STATUS_LIGHT if tema == "light" else _CORES_STATUS_DARK
+    bg, fg = cores.get(status, ("#1a1a1a", "#555"))
     label = LABELS_STATUS.get(status, str(status))
     return f'<span class="badge" style="background:{bg};color:{fg};">{label}</span>'
 

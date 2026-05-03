@@ -22,7 +22,7 @@ _OPCOES_STATUS = {v: k for k, v in LABELS_STATUS.items()}
 
 
 def render(db: Session, perfil_id: Optional[int] = None) -> None:
-    inject_css()
+    inject_css(st.session_state.get('tema', 'dark'))
     st.markdown('<div class="er-page-heading">Editais</div>', unsafe_allow_html=True)
 
     tab_lista, tab_importar = st.tabs(["Lista", "Importar manualmente"])
