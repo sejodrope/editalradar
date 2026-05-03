@@ -276,21 +276,21 @@ section[data-testid="stSidebar"] > div:first-child {{
 }}
 .er-alert-row {{ padding: 0.4rem 1.2rem; font-size: 0.8rem; color: {c['text_dim']}; }}
 
-/* Navegação — radio transformado em menu */
-/* Oculta APENAS o label "nav" acima do grupo — sem esconder o texto das opções */
-[data-testid="stSidebar"] .stRadio > div:first-of-type > label {{ display: none !important; }}
+/* Navegação — oculta label "nav" e estiliza opções como menu */
 [data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"] {{ display: none !important; }}
-[data-testid="stSidebar"] .stRadio > div {{ flex-direction: column !important; gap: 1px !important; padding: 0 0.6rem !important; }}
-[data-testid="stSidebar"] .stRadio label {{
-    display: flex !important; align-items: center !important;
-    padding: 9px 14px !important; border-radius: 7px !important; margin: 0 !important;
-    cursor: pointer !important; transition: all 0.15s !important;
-    font-size: 0.875rem !important; font-weight: 500 !important; color: {c['text_muted']} !important;
-    width: 100% !important; letter-spacing: 0.01em !important;
+[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] {{
+    display: flex !important; flex-direction: column !important;
+    gap: 2px !important; padding: 0 0.5rem !important;
 }}
-[data-testid="stSidebar"] .stRadio label:hover {{ background: {c['hover']} !important; color: {c['text']} !important; }}
-[data-testid="stSidebar"] .stRadio input[type="radio"] {{ position: absolute !important; opacity: 0 !important; width: 0 !important; height: 0 !important; }}
-[data-testid="stSidebar"] .stRadio label > div:first-child {{ display: none !important; }}
+[data-testid="stSidebar"] .stRadio label {{
+    padding: 9px 14px !important; border-radius: 7px !important; margin: 0 !important;
+    cursor: pointer !important; transition: background 0.15s, color 0.15s !important;
+    font-size: 0.875rem !important; font-weight: 500 !important;
+    color: {c['text_muted']} !important; width: 100% !important;
+}}
+[data-testid="stSidebar"] .stRadio label:hover {{
+    background: {c['hover']} !important; color: {c['text']} !important;
+}}
 
 /* Botão buscar / tema */
 [data-testid="stSidebar"] .stButton > button {{
