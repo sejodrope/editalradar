@@ -87,21 +87,24 @@ def render(db: Session, perfil_id: Optional[int] = None) -> None:
 
 def _render_tabela_documentos(db: Session, docs) -> None:
     """Exibe documentos em formato de tabela interativa com ações."""
-    header = st.columns([3, 1, 1, 2, 1])
-    header[0].markdown("**Nome**")
-    header[1].markdown("**Tipo**")
-    header[2].markdown("**Status**")
-    header[3].markdown("**Enviado em**")
-    header[4].markdown("**Ação**")
+    # 4 colunas: nome+tipo agrupados, status, data envio, ação
+    header = st.columns([4, 2, 2, 1])
+    header[0].markdown("**Documento**")
+    header[1].markdown("**Status**")
+    header[2].markdown("**Enviado em**")
+    header[3].markdown("**Ação**")
 
     for doc in docs:
-        c_nome, c_tipo, c_status, c_data, c_acao = st.columns([3, 1, 1, 2, 1])
+        c_nome, c_status, c_data, c_acao = st.columns([4, 2, 2, 1])
 
         icone_s = _ICONE_STATUS.get(doc.status, "❓")
         icone_t = _ICONE_TIPO.get(doc.tipo, "📄")
 
-        c_nome.markdown(f"{icone_t} {doc.nome}")
-        c_tipo.markdown(f"<small>{doc.tipo.value}</small>", unsafe_allow_html=True)
+        c_nome.markdown(
+            f"{icone_t} **{doc.nome}** "
+            f"<span style='color:#5a6a88;font-size:0.75rem;'>({doc.tipo.value})</span>",
+            unsafe_allow_html=True,
+        )
         c_status.markdown(f"{icone_s} <small>{doc.status.value}</small>", unsafe_allow_html=True)
         c_data.markdown(fmt_data(doc.data_envio) if doc.data_envio else "—")
 

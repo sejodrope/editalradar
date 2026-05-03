@@ -92,7 +92,6 @@ def _render_lista(db: Session, perfil_id: Optional[int]) -> None:
 def _gerar_csv(editais: list[Edital]) -> bytes:
     """Gera CSV dos editais para download."""
     import io, csv as csv_mod
-    from utils import fmt_data, fmt_valor, LABELS_STATUS
 
     buf = io.StringIO()
     writer = csv_mod.writer(buf)
@@ -292,7 +291,7 @@ def _render_importar(db: Session, perfil_id: Optional[int]) -> None:
 
     st.markdown("Preencha os campos abaixo para adicionar um edital manualmente.")
 
-    with st.form("form_importar", clear_on_submit=True):
+    with st.form(f"form_importar_{perfil_id}", clear_on_submit=True):
         titulo = st.text_input("Título *", placeholder="Chamada Pública BNDES — Restauração 2025")
         url = st.text_input("URL original", placeholder="https://...")
         orgao = st.text_input("Órgão publicador")

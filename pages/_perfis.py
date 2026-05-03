@@ -65,7 +65,8 @@ def _render_form_perfil(db: Session, perfil=None) -> None:
     """Formulário de criação/edição de perfil com gerenciamento de palavras-chave."""
     is_novo = perfil is None
 
-    with st.form("form_perfil"):
+    form_key = f"form_perfil_{perfil.id if perfil else 'novo'}"
+    with st.form(form_key):
         nome = st.text_input("Nome *", value=perfil.nome if perfil else "")
         area = st.text_input("Área de atuação", value=perfil.area_atuacao or "" if perfil else "")
         descricao = st.text_area(
