@@ -67,14 +67,43 @@ def _render_lista(db: Session, perfil_id: Optional[int]) -> None:
         data_fim=datetime.combine(data_fim, datetime.max.time()) if data_fim else None,
     )
 
-    st.markdown(f"**{len(editais)} edital(is) encontrado(s)**")
+    col_count, col_csv = st.columns([3, 1])
+    col_count.markdown(f"**{len(editais)} edital(is) encontrado(s)**")
 
     if not editais:
         st.info("Nenhum edital encontrado com os filtros selecionados.")
         return
 
+    # Exportar CSV
+    with col_csv:
+        csv = _gerar_csv(editais)
+        st.download_button(
+            "⬇️ Exportar CSV",
+            data=csv,
+            file_name="editais.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
     for edital in editais:
         _render_card_edital(db, edital)
+
+
+def _gerar_csv(editais: list[Edital]) -> bytes:
+    """Gera CSV dos editais para download."""
+    import io, csv as csv_mod
+    from utils import fmt_data, fmt_valor, LABELS_STATUS
+
+    buf = io.StringIO()
+    writer = csv_mod.writer(buf)
+    writer.writerow(["Título", "Órgão", "Status", "Modalidade", "Prazo", "Valor", "Relevância", "Fonte", "URL"])
+    for e in editais:
+        writer.writerow([
+            e.titulo, e.orgao_publicador or "", LABELS_STATUS.get(e.status, ""),
+            e.modalidade or "", fmt_data(e.data_encerramento), fmt_valor(e.valor_total),
+            e.relevancia_score or "", e.fonte or "", e.url_original or "",
+        ])
+    return buf.getvalue().encode("utf-8-sig")  # BOM para Excel abrir corretamente
 
 
 def _render_card_edital(db: Session, edital: Edital) -> None:
@@ -216,6 +245,19 @@ def _render_acoes_edital(db: Session, edital: Edital) -> None:
                 crud.atualizar_edital(db, edital.id, observacoes=obs)
                 st.success("Observação salva.")
                 st.rerun()
+
+    # Re-análise IA
+    from ai.gemini import esta_configurado, reanalisar_edital
+    if esta_configurado():
+        perfil = crud.obter_perfil(db, edital.perfil_id)
+        if perfil and st.button("🤖 Re-analisar com IA", key=f"ia_{edital.id}", help="Recalcula relevância com Gemini"):
+            with st.spinner("Analisando com Gemini 2.5 Flash…"):
+                resultado = reanalisar_edital(db, edital.id, perfil)
+            if resultado:
+                st.success(f"Relevância: {resultado['relevancia']}/100 — {resultado['motivo'][:100]}")
+                st.rerun()
+            else:
+                st.error("Falha na análise. Verifique a chave da API.")
 
     # Zona de perigo
     with st.expander("⚠️ Ações destrutivas"):

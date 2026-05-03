@@ -165,6 +165,35 @@ div[data-testid="stAlert"] {
     font-size: 0.9rem !important;
 }
 
+/* ── Responsividade ───────────────────────────────────────────────────── */
+/* Evita overflow horizontal */
+.main .block-container {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+/* Texto nunca vaza do container */
+p, span, div, h1, h2, h3 {
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+}
+/* Inputs responsivos */
+.stTextInput, .stTextArea, .stSelectbox, .stNumberInput {
+    max-width: 100% !important;
+}
+/* Colunas em telas menores */
+[data-testid="column"] {
+    min-width: 0 !important;
+}
+/* Tabelas / DataFrames não transbordam */
+[data-testid="stDataFrame"] {
+    overflow-x: auto !important;
+    max-width: 100% !important;
+}
+/* Plotly charts responsivos */
+.js-plotly-plot {
+    max-width: 100% !important;
+}
+
 /* ── Scrollbar ────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

@@ -19,10 +19,62 @@ from utils import (
 def render(db: Session, perfil_id: Optional[int] = None) -> None:
     """Renderiza a página Dashboard."""
     inject_css()
-    st.title("Dashboard")
 
     perfil = crud.obter_perfil(db, perfil_id) if perfil_id else None
-    label_perfil = perfil.nome if perfil else "Todos os perfis"
+    perfis_existem = bool(crud.listar_perfis(db))
+
+    # ── Onboarding (sem perfis ainda) ─────────────────────────────────────
+    if not perfis_existem:
+        st.markdown(
+            '<div style="text-align:center;padding:3rem 1rem;">'
+            '<div style="font-size:4rem;margin-bottom:1rem;">🎯</div>'
+            '<h2 style="color:#dce8fa;margin-bottom:0.5rem;">Bem-vindo ao EditalRadar</h2>'
+            '<p style="color:#6b7fa3;max-width:500px;margin:0 auto 2rem;">'
+            'Monitore editais e chamadas públicas brasileiras com triagem automática por IA.'
+            '</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            st.markdown(
+                '<div style="background:linear-gradient(135deg,#131825,#16202e);border:1px solid rgba(255,255,255,0.07);'
+                'border-radius:14px;padding:20px;text-align:center;">'
+                '<div style="font-size:2rem;margin-bottom:8px;">👤</div>'
+                '<strong style="color:#dce8fa;">1. Crie um Perfil</strong>'
+                '<p style="color:#6b7fa3;font-size:0.85rem;margin-top:6px;">'
+                'Defina sua área de atuação e palavras-chave de interesse.</p></div>',
+                unsafe_allow_html=True,
+            )
+        with col_b:
+            st.markdown(
+                '<div style="background:linear-gradient(135deg,#131825,#16202e);border:1px solid rgba(255,255,255,0.07);'
+                'border-radius:14px;padding:20px;text-align:center;">'
+                '<div style="font-size:2rem;margin-bottom:8px;">🔍</div>'
+                '<strong style="color:#dce8fa;">2. Busque Editais</strong>'
+                '<p style="color:#6b7fa3;font-size:0.85rem;margin-top:6px;">'
+                'Clique em "Buscar" na barra lateral para encontrar editais relevantes.</p></div>',
+                unsafe_allow_html=True,
+            )
+        with col_c:
+            st.markdown(
+                '<div style="background:linear-gradient(135deg,#131825,#16202e);border:1px solid rgba(255,255,255,0.07);'
+                'border-radius:14px;padding:20px;text-align:center;">'
+                '<div style="font-size:2rem;margin-bottom:8px;">🤖</div>'
+                '<strong style="color:#dce8fa;">3. IA Triagem</strong>'
+                '<p style="color:#6b7fa3;font-size:0.85rem;margin-top:6px;">'
+                'O Gemini pontua relevância e gera resumos automaticamente.</p></div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_btn, _ = st.columns([1, 2])
+        with col_btn:
+            if st.button("👤 Criar meu primeiro perfil", type="primary", use_container_width=True):
+                st.session_state["pagina"] = "Perfis"
+                st.rerun()
+        return
+
+    st.title("Dashboard")
 
     # ── Métricas ──────────────────────────────────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
