@@ -1,0 +1,30 @@
+# Ambiente Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.Python
+
+# App — dados locais (nunca commitar)
+.env
+editalradar.db
+editalradar.log
+uploads/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Streamlit cache
+.streamlit/secrets.toml
