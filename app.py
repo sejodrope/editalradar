@@ -18,9 +18,8 @@ import crud
 from utils import inject_css
 
 
-# ── Carrega .env antes de tudo ────────────────────────────────────────────
+# ── Carrega .env ──────────────────────────────────────────────────────────
 def _load_env() -> None:
-    """Carrega variáveis do .env no ambiente sem depender de python-dotenv."""
     env_path = Path(__file__).parent / ".env"
     if not env_path.exists():
         return
@@ -59,7 +58,7 @@ st.set_page_config(
 )
 
 
-# ── Banco + Scheduler (inicializam uma vez por processo) ──────────────────
+# ── Recursos singleton ────────────────────────────────────────────────────
 @st.cache_resource
 def _init_db():
     init_db("editalradar.db")
@@ -75,20 +74,17 @@ _init_db()
 _scheduler = _start_scheduler()
 
 
-# ── Função de busca (definida antes do sidebar que a chama) ───────────────
+# ── Função de busca (deve estar antes do sidebar) ─────────────────────────
 def _executar_busca(db, perfil_unico, todos_perfis) -> None:
-    """Executa busca completa para um perfil ou para todos, com triagem IA."""
     from scrapers.web_search import executar_busca_completa
     from ai.gemini import triar_editais
 
     alvos = [perfil_unico] if perfil_unico else todos_perfis
     total_novos = 0
 
-    with st.spinner(f"Buscando editais para {len(alvos)} perfil(is)…"):
+    with st.spinner(f"Buscando editais para {len(alvos)} perfil(is)..."):
         for perfil in alvos:
             resultado = executar_busca_completa(db, perfil)
-
-            # Tria apenas os editais criados nos últimos 10 minutos
             cutoff = datetime.utcnow() - timedelta(minutes=10)
             novos = [
                 e for e in crud.listar_editais(db, perfil_id=perfil.id, status=[StatusEdital.NOVO])
@@ -97,13 +93,12 @@ def _executar_busca(db, perfil_unico, todos_perfis) -> None:
             if novos:
                 triar_editais(db, novos, perfil)
                 crud.gerar_alertas_prazo(db)
-
             total_novos += resultado.get("pncp", 0) + resultado.get("web", 0)
 
     if total_novos:
-        st.sidebar.success(f"✅ {total_novos} novo(s) edital(is) encontrado(s)!")
+        st.sidebar.success(f"{total_novos} novo(s) edital(is) encontrado(s).")
     else:
-        st.sidebar.info("Nenhum edital novo encontrado desta vez.")
+        st.sidebar.info("Nenhum edital novo encontrado.")
     st.rerun()
 
 
@@ -118,10 +113,11 @@ inject_css()
 
 # ── Sidebar ───────────────────────────────────────────────────────────────
 with st.sidebar:
+    # Logo
     st.markdown(
-        '<div class="sidebar-logo-wrap">'
-        '<span class="sidebar-logo">EditalRadar 🎯</span>'
-        '<div class="sidebar-sub">Monitoramento de editais</div>'
+        '<div class="er-logo">'
+        '<span class="er-logo-text">EditalRadar 🎯</span>'
+        '<div class="er-logo-sub">Monitoramento de editais públicos</div>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -131,7 +127,7 @@ with st.sidebar:
     perfil_id_sb = st.session_state.get("perfil_id")
 
     # Perfil ativo
-    st.markdown('<div class="section-heading">Perfil ativo</div>', unsafe_allow_html=True)
+    st.markdown('<div class="er-section">Perfil</div>', unsafe_allow_html=True)
     if perfis:
         opcoes_perfis = {"Todos os perfis": None}
         opcoes_perfis.update({p.nome: p.id for p in perfis})
@@ -150,26 +146,25 @@ with st.sidebar:
             st.session_state["perfil_id"] = novo_id
             st.rerun()
     else:
-        st.caption("Nenhum perfil cadastrado ainda.")
+        st.caption("Nenhum perfil cadastrado.")
         st.session_state["perfil_id"] = None
 
-    # Contador de alertas
+    # Alertas
     nao_lidos = crud.contar_alertas_nao_lidos(db_sidebar, perfil_id_sb)
     if nao_lidos:
         st.markdown(
-            f'<div style="margin:8px 0 4px;">🔔 Alertas pendentes'
-            f'<span class="alert-dot">{nao_lidos}</span></div>',
+            f'<div class="er-alert-row">Alertas pendentes'
+            f'<span class="er-alert-badge">{nao_lidos}</span></div>',
             unsafe_allow_html=True,
         )
 
     # Navegação
-    st.markdown('<div class="section-heading">Navegação</div>', unsafe_allow_html=True)
+    st.markdown('<div class="er-section">Navegação</div>', unsafe_allow_html=True)
     paginas = ["Dashboard", "Editais", "Perfis", "Documentos", "Configurações"]
-    icones  = ["🏠", "📋", "👤", "📁", "⚙️"]
+
     pagina_sel = st.radio(
         "nav",
         options=paginas,
-        format_func=lambda p: f"{icones[paginas.index(p)]}  {p}",
         index=paginas.index(st.session_state.get("pagina", "Dashboard")),
         label_visibility="collapsed",
     )
@@ -177,23 +172,23 @@ with st.sidebar:
         st.session_state["pagina"] = pagina_sel
         st.rerun()
 
-    # Botão buscar
+    # Botão de busca
     if perfis:
-        st.markdown("---")
+        st.markdown('<div style="height:0.5rem;"></div>', unsafe_allow_html=True)
         perfil_para_busca = (
             crud.obter_perfil(db_sidebar, perfil_id_sb) if perfil_id_sb else None
         )
         btn_label = (
-            f"🔍 Buscar: {perfil_para_busca.nome[:22]}"
+            f"Buscar: {perfil_para_busca.nome[:24]}"
             if perfil_para_busca
-            else "🔍 Buscar todos os perfis"
+            else "Buscar todos os perfis"
         )
         if st.button(btn_label, use_container_width=True, type="primary"):
             _executar_busca(db_sidebar, perfil_para_busca, perfis)
 
     db_sidebar.close()
 
-# ── Roteamento de páginas ─────────────────────────────────────────────────
+# ── Roteamento ────────────────────────────────────────────────────────────
 db_main = get_session()
 try:
     pagina = st.session_state.get("pagina", "Dashboard")
