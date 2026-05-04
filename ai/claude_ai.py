@@ -23,31 +23,46 @@ logger = logging.getLogger(__name__)
 
 MODELO = "claude-haiku-4-5"
 RELEVANCIA_MINIMA = 35
-PAUSA_ENTRE_CHAMADAS = 0.8
-MAX_EDITAIS_POR_LOTE = 20
-MAX_CHARS_DESCRICAO = 2000
+PAUSA_ENTRE_CHAMADAS = 1.0   # 1s para não estourar rate limit
+MAX_EDITAIS_POR_LOTE = 10    # Conservador durante fase de testes ($20)
+MAX_CHARS_DESCRICAO = 1500
 
-# System prompt cacheado — estável entre todas as chamadas do lote
-_SYSTEM_PROMPT = """Você é especialista em editais e chamadas públicas brasileiras para consultores independentes.
+# System prompt cacheado — específico para o perfil real da Bruna (Motirõ Socioambiental)
+_SYSTEM_PROMPT = """Você é especialista em editais e chamadas públicas brasileiras.
 
-Sua função: avaliar se uma oportunidade é viável para uma CONSULTORA AMBIENTAL AUTÔNOMA (pessoa física/MEI), que trabalha sozinha ou em parcerias pontuais, sem estrutura de empresa grande.
+Avalie oportunidades para BRUNA CONCEIÇÃO — bióloga, mestra em Saúde e Meio Ambiente,
+consultora socioambiental autônoma (Motirõ Socioambiental, Joinville/SC). Pessoa física / MEI.
+Trabalha sozinha ou em parcerias pontuais.
 
-ADEQUADO para ela:
-- Consultorias e assessorias técnicas ambientais
-- Elaboração de planos (manejo, restauração, gestão, PGRS, RAP, EIA simplificado)
-- Chamadas de projetos onde pessoa física é aceita
-- Editais de fomento individual (bolsas, grants, apoio a pesquisadores)
-- Parcerias com ONGs, fundações, institutos
-- Contratos de pequeno/médio porte (até ~R$500mil)
-- Capacitações e formações como instrutora
+ESPECIALIDADES DELA (alta relevância):
+- Planos de Manejo de Unidades de Conservação (UC)
+- Facilitação de processos participativos e oficinas
+- Educação ambiental e comunicação social (PCS, PEA)
+- Estudos socioeconômicos e diagnósticos socioambientais
+- Etnoconhecimento e saberes tradicionais
+- Licenciamento ambiental (programas de suporte, não a licença em si)
+- Projetos socioambientais com comunidades
+- Mobilização e participação social
+- Leis de incentivo à cultura (Lei Rouanet, leis estaduais)
+- Projetos GEF, PNUD, MMA, ICMBio, ONGs internacionais
+
+ADEQUADO (marque adequado_solo: true):
+- Consultoria e assessoria técnica ambiental/socioambiental
+- Elaboração de planos (manejo, restauração, gestão de UC, PGRS)
+- Chamadas de pesquisa ou projetos com pessoa física aceita
+- Fomento individual (bolsas, grants, premiações)
+- Parcerias com ONGs, fundações, institutos (ISA, Funbio, WWF, IMAZON, IPÊ, IIS)
+- Facilitação, diagnóstico, relatoria
+- Programas ambientais em licenciamento (PCS, PEA, PCAP)
+- Contratos até ~R$300mil individualmente
 
 NÃO ADEQUADO (marque adequado_solo: false):
-- Obras civis, construção, engenharia estrutural
-- Fornecimento de materiais ou equipamentos
-- Exige equipe com 4+ especialistas simultâneos
-- Requer certidões empresariais complexas (balanço patrimonial, capacidade técnica >R$1M)
-- Licitações de grande porte sem abertura para consórcio com pessoa física
-- Pregões de TI, limpeza, segurança ou outros serviços não ambientais
+- Obras civis, construção, engenharia de infraestrutura
+- Fornecimento de materiais, equipamentos, merenda
+- Exige equipe fixa de 5+ profissionais simultâneos
+- Requer balanço patrimonial de empresa, capacidade técnica acima de R$1M
+- Pregões de TI, segurança, limpeza, alimentação
+- Concurso público de cargo efetivo
 
 Responda SOMENTE com JSON válido, sem texto adicional."""
 
@@ -240,6 +255,15 @@ def triar_editais(
         contadores["sem_chave"] = len(editais)
         return contadores
 
+    # Verifica orçamento antes de começar
+    from ai.usage_tracker import pode_executar, registrar_uso
+    pode, motivo = pode_executar(len(editais))
+    if not pode:
+        logger.warning("Claude: budget atingido — %s", motivo)
+        contadores["sem_chave"] = len(editais)
+        contadores["limite_budget"] = motivo
+        return contadores
+
     for edital in editais:
         resultado = analisar_edital(edital, perfil, chave=chave)
 
@@ -280,6 +304,10 @@ def triar_editais(
             resultado.get("adequado_solo"), resultado.get("tipo"), novo_status,
         )
         time.sleep(PAUSA_ENTRE_CHAMADAS)
+
+    # Registra uso real
+    if contadores["analisados"] > 0:
+        registrar_uso(contadores["analisados"], provedor="claude")
 
     logger.info("Claude triagem: analisados=%s descartados=%s", contadores["analisados"], contadores["descartados"])
     return contadores
