@@ -135,7 +135,7 @@ def _render_onboarding() -> None:
     for col, num, titulo, desc in [
         (col_a, "1", "Crie um Perfil", "Defina sua área de atuação e palavras-chave de interesse."),
         (col_b, "2", "Busque Editais", "Execute uma busca nas fontes configuradas para o seu perfil."),
-        (col_c, "3", "Triagem por IA", "O Gemini pontua relevância, gera resumos e filtra automaticamente."),
+        (col_c, "3", "Triagem por IA", "Claude analisa relevância, gera resumos e descarta oportunidades inadequadas."),
     ]:
         with col:
             st.markdown(

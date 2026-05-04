@@ -7,7 +7,8 @@ requests==2.32.3
 ddgs>=1.0.0                  # novo nome do duckduckgo-search
 
 # ── IA ────────────────────────────────────────────────────────────────────────
-google-genai>=1.0.0          # SDK oficial Gemini (substitui google-generativeai)
+anthropic>=0.75.0            # Claude API (provedor principal)
+google-genai>=1.0.0          # Gemini API (fallback gratuito)
 
 # ── Visualização ─────────────────────────────────────────────────────────────
 plotly==6.6.0

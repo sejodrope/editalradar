@@ -16,7 +16,11 @@ editalradar.db
 editalradar.db-shm
 editalradar.db-wal
 editalradar.log
+usage_stats.json
 uploads/
+
+# Arquivos temporários do editor
+*.tmp.*
 
 # IDEs
 .vscode/
