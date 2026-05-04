@@ -24,9 +24,10 @@ logger = logging.getLogger(__name__)
 # gemini-2.5-flash-lite: modelo mais recente, raciocínio melhorado, free tier generoso
 MODELO = "gemini-2.5-flash-lite"
 RELEVANCIA_MINIMA = 30
-PAUSA_ENTRE_CHAMADAS = 2.0   # 2s entre chamadas → ~30/min (seguro no free tier)
+# Free tier: 5 req/min → precisamos de 13s entre chamadas para ficar seguro
+PAUSA_ENTRE_CHAMADAS = 13.0
 MAX_CHARS_DESCRICAO = 1500
-MAX_EDITAIS_POR_LOTE = 10
+MAX_EDITAIS_POR_LOTE = 5   # 5 editais × 13s = ~65s máximo por lote
 
 
 # ---------------------------------------------------------------------------
