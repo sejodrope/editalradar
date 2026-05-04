@@ -30,6 +30,33 @@ from utils import (
 _TODOS_STATUS = list(StatusEdital)
 _OPCOES_STATUS = {v: k for k, v in LABELS_STATUS.items()}
 
+_TIPO_LABEL = {
+    "consultoria":      ("Consultoria",       "#0d2e1e", "#00c48c"),
+    "parceria":         ("Parceria",          "#251540", "#b06fff"),
+    "fomento":          ("Fomento",           "#0d2444", "#4da9ff"),
+    "projeto_tecnico":  ("Proj. Técnico",     "#2a1a10", "#ff9f40"),
+    "capacitacao":      ("Capacitação",       "#1a2a3a", "#5ab4ff"),
+    "licitacao_compra": ("Licitação/Compra",  "#2b2b2b", "#888888"),
+    "outro":            ("Outro",             "#1a1a1a", "#666666"),
+}
+
+def _badge_tipo(tipo: Optional[str]) -> str:
+    if not tipo:
+        return ""
+    label, bg, fg = _TIPO_LABEL.get(tipo, ("Outro", "#1a1a1a", "#666"))
+    return (f'<span style="background:{bg};color:{fg};padding:2px 9px;border-radius:20px;'
+            f'font-size:0.65rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;'
+            f'vertical-align:middle;margin-left:4px;">{label}</span>')
+
+def _badge_solo(adequado: Optional[bool]) -> str:
+    if adequado is None:
+        return ""
+    if adequado:
+        return ('<span style="background:#0d2e1e;color:#00c48c;padding:2px 8px;border-radius:20px;'
+                'font-size:0.63rem;font-weight:700;vertical-align:middle;margin-left:4px;">✓ Solo</span>')
+    return ('<span style="background:#2b1010;color:#ff6b6b;padding:2px 8px;border-radius:20px;'
+            'font-size:0.63rem;font-weight:700;vertical-align:middle;margin-left:4px;">✗ Solo</span>')
+
 
 def render(db: Session, perfil_id: Optional[int] = None) -> None:
     inject_css(st.session_state.get('tema', 'dark'))
@@ -50,25 +77,38 @@ def render(db: Session, perfil_id: Optional[int] = None) -> None:
 def _render_lista(db: Session, perfil_id: Optional[int]) -> None:
     with st.expander("Filtros", expanded=False):
         c1, c2, c3 = st.columns(3)
-        texto     = c1.text_input("Texto", placeholder="título, órgão...")
+        texto      = c1.text_input("Texto", placeholder="título, órgão...")
         status_sel = c2.multiselect("Status", options=list(LABELS_STATUS.values()))
-        modalidade = c3.text_input("Modalidade", placeholder="Pregão, Chamada...")
+        tipo_sel   = c3.multiselect(
+            "Tipo",
+            options=list(_TIPO_LABEL.keys()),
+            format_func=lambda k: _TIPO_LABEL[k][0],
+        )
 
-        c4, c5 = st.columns(2)
+        c4, c5, c6 = st.columns(3)
         data_ini = c4.date_input("Prazo a partir de", value=None)
         data_fim = c5.date_input("Prazo até", value=None)
+        apenas_solo = c6.checkbox("Apenas adequados para solo", value=True)
 
     status_filtro = [_OPCOES_STATUS[s] for s in status_sel] if status_sel else None
 
-    editais = crud.listar_editais(
+    editais_raw = crud.listar_editais(
         db,
         perfil_id=perfil_id,
         status=status_filtro,
-        modalidade=modalidade or None,
+        modalidade=None,
         texto=texto or None,
         data_inicio=datetime.combine(data_ini, datetime.min.time()) if data_ini else None,
         data_fim=datetime.combine(data_fim, datetime.max.time()) if data_fim else None,
     )
+
+    # Filtros client-side (tipo e solo)
+    editais = editais_raw
+    if tipo_sel:
+        editais = [e for e in editais if getattr(e, "tipo_oportunidade", None) in tipo_sel]
+    if apenas_solo:
+        editais = [e for e in editais
+                   if getattr(e, "adequado_solo", None) is not False]
 
     total = len(editais)
     col_count, col_csv = st.columns([3, 1])
@@ -152,9 +192,12 @@ def _render_card_edital(db: Session, edital: Edital) -> None:
     with st.expander(label_expander, expanded=False):
         col_h, col_rel = st.columns([3, 1])
         with col_h:
+            # Badges: status + tipo + adequado_solo
+            tipo_badge = _badge_tipo(getattr(edital, "tipo_oportunidade", None))
+            solo_badge = _badge_solo(getattr(edital, "adequado_solo", None))
             st.markdown(
-                f"{badge_html(edital.status)} "
-                f'<span style="color:#3d5068;font-size:0.82rem;margin-left:8px;">'
+                f"{badge_html(edital.status)} {tipo_badge} {solo_badge}"
+                f'<span style="color:#3d5068;font-size:0.82rem;margin-left:6px;">'
                 f'{edital.orgao_publicador or "—"} · {edital.modalidade or "—"} · {edital.fonte or "—"}'
                 f'</span>',
                 unsafe_allow_html=True,
@@ -167,6 +210,17 @@ def _render_card_edital(db: Session, edital: Edital) -> None:
         c2.metric("Abertura",      fmt_data(edital.data_abertura))
         c3.metric("Encerramento",  fmt_prazo(edital.data_encerramento))
         c4.metric("Valor total",   fmt_valor(edital.valor_total))
+
+        # Requisitos da IA (o que precisa para concorrer)
+        requisitos = getattr(edital, "requisitos_chave", None)
+        if requisitos:
+            st.markdown(
+                f'<div style="background:rgba(0,196,140,0.06);border:1px solid rgba(0,196,140,0.15);'
+                f'border-radius:8px;padding:8px 14px;margin:6px 0;font-size:0.83rem;color:#8099b8;">'
+                f'<strong style="color:#00c48c;font-size:0.72rem;letter-spacing:0.05em;'
+                f'text-transform:uppercase;">Requisitos</strong><br>{requisitos}</div>',
+                unsafe_allow_html=True,
+            )
 
         if edital.descricao_curta:
             st.markdown(

@@ -177,9 +177,9 @@ def buscar_e_salvar_pncp(
         return []
 
     hoje = datetime.now()
-    # PNCP aceita formato YYYYMMDD ou YYYY-MM-DD — testamos os dois
-    data_inicial = (hoje - timedelta(days=dias_retroativos)).strftime("%Y-%m-%d")
-    data_final = hoje.strftime("%Y-%m-%d")
+    # API PNCP usa formato YYYYMMDD (sem traços)
+    data_inicial = (hoje - timedelta(days=dias_retroativos)).strftime("%Y%m%d")
+    data_final = hoje.strftime("%Y%m%d")
 
     logger.info(
         "PNCP: iniciando busca para perfil '%s' | %s → %s",

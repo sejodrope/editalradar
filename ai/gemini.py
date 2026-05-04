@@ -94,12 +94,21 @@ def _validar_resultado(dados: dict) -> dict:
 
     tags = dados.get("tags", [])
     if not isinstance(tags, list):
-        tags = []  # qualquer não-lista vira lista vazia
+        tags = []
     tags = [str(t).strip() for t in tags if t and len(str(t).strip()) > 1][:8]
+
+    adequado = dados.get("adequado_solo")
+    tipos_validos = {"consultoria", "parceria", "fomento", "projeto_tecnico",
+                     "capacitacao", "licitacao_compra", "outro"}
+    tipo_raw = str(dados.get("tipo", "")).strip().lower()
 
     return {
         "relevancia": relevancia,
+        "adequado_solo": bool(adequado) if adequado is not None else True,
+        "tipo": tipo_raw if tipo_raw in tipos_validos else "outro",
+        "alerta": str(dados.get("alerta", "")).strip()[:300],
         "motivo": str(dados.get("motivo", "")).strip()[:400],
+        "requisitos_chave": str(dados.get("requisitos_chave", "")).strip()[:500],
         "tags": tags,
         "resumo_curto": str(dados.get("resumo_curto", "")).strip()[:300],
     }
@@ -114,21 +123,23 @@ def _montar_prompt(edital: Edital, perfil: Perfil) -> str:
         edital.descricao_completa or edital.descricao_curta or edital.titulo or ""
     )[:MAX_CHARS_DESCRICAO]
 
-    palavras = ", ".join(perfil.palavras_chave or []) or "não especificadas"
-    area = perfil.area_atuacao or perfil.nome or "não especificada"
+    palavras = ", ".join(perfil.palavras_chave or []) or "meio ambiente"
+    area = perfil.area_atuacao or perfil.nome or "consultoria ambiental"
+    valor = f"R$ {edital.valor_total:,.0f}".replace(",", ".") if edital.valor_total else "não informado"
 
     return (
-        f"Avalie a relevância deste edital para um profissional de '{area}' "
-        f"com foco em: {palavras}.\n\n"
+        f"Avalie se este edital é viável para uma CONSULTORA AMBIENTAL AUTÔNOMA (pessoa física/MEI) "
+        f"especializada em '{area}', com foco em: {palavras}.\n"
+        f"Ela trabalha sozinha. Busca: consultorias, elaboração de planos, parcerias com ONGs, fomento individual.\n"
+        f"NÃO adequado: obras, fornecimento de materiais, equipe grande (4+), empresa com balanço.\n\n"
         f"Título: {edital.titulo}\n"
         f"Órgão: {edital.orgao_publicador or 'não informado'}\n"
+        f"Valor: {valor}\n"
         f"Descrição: {descricao}\n\n"
-        "Responda SOMENTE com JSON válido (sem explicações, sem markdown):\n"
-        '{"relevancia":0,"motivo":"string","tags":["tag"],"resumo_curto":"string"}\n\n'
-        "- relevancia: inteiro de 0 a 100 (0=sem relação, 100=totalmente relevante)\n"
-        "- motivo: 1 frase explicando\n"
-        "- tags: até 5 palavras-chave do edital\n"
-        "- resumo_curto: resumo em até 150 caracteres"
+        "Responda SOMENTE com JSON (sem texto extra):\n"
+        '{"relevancia":0,"adequado_solo":true,"tipo":"consultoria","alerta":"",'
+        '"motivo":"1 frase","requisitos_chave":"o que exige","tags":["tag"],"resumo_curto":"até 150 chars"}\n'
+        "tipo: consultoria|parceria|fomento|projeto_tecnico|capacitacao|licitacao_compra|outro"
     )
 
 
@@ -245,29 +256,30 @@ def triar_editais(
             continue
 
         contadores["analisados"] += 1
-        novo_status = (
-            StatusEdital.DESCARTADO
-            if resultado["relevancia"] < RELEVANCIA_MINIMA
-            else edital.status
-        )
+        nao_adequado = not resultado.get("adequado_solo", True)
+        baixa_relevancia = resultado["relevancia"] < RELEVANCIA_MINIMA
+        novo_status = StatusEdital.DESCARTADO if (nao_adequado or baixa_relevancia) else edital.status
         if novo_status == StatusEdital.DESCARTADO:
             contadores["descartados"] += 1
+
+        alerta = resultado.get("alerta", "")
+        obs_ia = f"[IA] {resultado['motivo']}" + (f" | ⚠️ {alerta}" if alerta else "")
 
         crud.atualizar_edital(
             db, edital.id,
             relevancia_score=resultado["relevancia"],
             tags=resultado["tags"],
             descricao_curta=resultado["resumo_curto"] or edital.descricao_curta,
-            observacoes=(
-                f"[IA] {resultado['motivo']}"
-                if resultado["motivo"] and not edital.observacoes
-                else edital.observacoes
-            ),
+            observacoes=obs_ia if not edital.observacoes else edital.observacoes,
             status=novo_status,
+            tipo_oportunidade=resultado.get("tipo"),
+            adequado_solo=resultado.get("adequado_solo", True),
+            requisitos_chave=resultado.get("requisitos_chave"),
         )
         logger.info(
-            "Gemini: id=%s relevancia=%s status=%s",
-            edital.id, resultado["relevancia"], novo_status,
+            "Gemini: id=%s rel=%s solo=%s tipo=%s status=%s",
+            edital.id, resultado["relevancia"],
+            resultado.get("adequado_solo"), resultado.get("tipo"), novo_status,
         )
         time.sleep(PAUSA_ENTRE_CHAMADAS)
 

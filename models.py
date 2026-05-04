@@ -131,9 +131,13 @@ class Edital(Base):
         default=StatusEdital.NOVO,
     )
     perfil_id = Column(Integer, ForeignKey("perfis.id"), nullable=False)
-    relevancia_score = Column(Integer, nullable=True)  # 0-100
+    relevancia_score = Column(Integer, nullable=True)   # 0-100
     tags = Column(JSONList, nullable=False, default=list)
     observacoes = Column(Text, nullable=True)
+    # Campos de triagem para consultora solo (adicionados via migração)
+    tipo_oportunidade = Column(String(100), nullable=True)  # consultoria|parceria|fomento|etc.
+    adequado_solo = Column(Boolean, nullable=True, default=True)
+    requisitos_chave = Column(Text, nullable=True)          # resumo do que é exigido
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -228,10 +232,28 @@ def get_engine(db_path: str = "editalradar.db"):
 
 
 def init_db(db_path: str = "editalradar.db"):
-    """Cria todas as tabelas no banco se ainda não existirem."""
+    """Cria todas as tabelas e executa migrações de colunas novas."""
     engine = get_engine(db_path)
     Base.metadata.create_all(engine)
+    _migrate_columns(engine)
     return engine
+
+
+def _migrate_columns(engine) -> None:
+    """Adiciona colunas novas ao banco sem quebrar dados existentes."""
+    from sqlalchemy import text
+    novas_colunas = [
+        "ALTER TABLE editais ADD COLUMN tipo_oportunidade VARCHAR(100)",
+        "ALTER TABLE editais ADD COLUMN adequado_solo BOOLEAN DEFAULT 1",
+        "ALTER TABLE editais ADD COLUMN requisitos_chave TEXT",
+    ]
+    with engine.connect() as conn:
+        for sql in novas_colunas:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # coluna já existe — normal em banco existente
 
 
 def get_session(db_path: str = "editalradar.db") -> Session:

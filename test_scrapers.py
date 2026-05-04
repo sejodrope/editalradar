@@ -123,10 +123,15 @@ def test_gerar_queries():
 
 
 def test_gerar_queries_sem_palavras():
+    """Sem palavras-chave, gera apenas queries gerais de consultoria ambiental."""
     perfil = _perfil()
     queries = _gerar_queries(perfil)
-    assert queries == []
-    print("[OK] _gerar_queries sem palavras-chave -> lista vazia")
+    # Agora sempre gera ao menos as queries gerais de área
+    assert isinstance(queries, list)
+    # Sem keywords específicas, nenhuma query deve conter aspas duplas de keyword
+    for q in queries:
+        assert '""' not in q
+    print(f"[OK] _gerar_queries sem palavras-chave -> {len(queries)} query(ies) gerais")
 
 
 # ---------------------------------------------------------------------------

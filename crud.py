@@ -196,6 +196,7 @@ def atualizar_edital(db: Session, edital_id: int, **campos) -> Optional[Edital]:
         "fonte", "url_original", "data_publicacao", "data_abertura",
         "data_encerramento", "data_resultado", "valor_total", "modalidade",
         "status", "relevancia_score", "tags", "observacoes",
+        "tipo_oportunidade", "adequado_solo", "requisitos_chave",
     }
     for campo, valor in campos.items():
         if campo in campos_permitidos:
