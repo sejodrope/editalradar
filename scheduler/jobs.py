@@ -62,7 +62,7 @@ def job_busca_editais(db_path: str = DB_PATH) -> dict[str, int]:
     from models import get_session
     import crud
     from scrapers.web_search import executar_busca_completa
-    from ai.gemini import triar_editais
+    from ai.triagem import triar_editais
 
     contadores: dict[str, int] = {"pncp": 0, "web": 0, "perfis_buscados": 0, "triados": 0}
     db = get_session(db_path)

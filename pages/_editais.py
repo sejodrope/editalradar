@@ -263,11 +263,11 @@ def _render_acoes_edital(db: Session, edital: Edital) -> None:
                 st.rerun()
 
     # Re-análise IA
-    from ai.gemini import esta_configurado, reanalisar_edital
+    from ai.triagem import esta_configurado, reanalisar_edital
     if esta_configurado():
         perfil = crud.obter_perfil(db, edital.perfil_id)
         if perfil and st.button("Analisar com IA", key=f"ia_{edital.id}"):
-            with st.spinner("Consultando Gemini 2.5 Flash..."):
+            with st.spinner("Consultando IA..."):
                 resultado = reanalisar_edital(db, edital.id, perfil)
             if resultado:
                 st.success(f"Relevância: {resultado['relevancia']}/100 — {resultado['motivo'][:120]}")

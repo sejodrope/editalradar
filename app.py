@@ -78,7 +78,7 @@ _scheduler = _start_scheduler()
 # ── Função de busca (deve estar antes do sidebar) ─────────────────────────
 def _executar_busca(db, perfil_unico, todos_perfis) -> None:
     from scrapers.web_search import executar_busca_completa
-    from ai.gemini import triar_editais
+    from ai.triagem import triar_editais
 
     alvos = [perfil_unico] if perfil_unico else todos_perfis
     total_novos = 0
