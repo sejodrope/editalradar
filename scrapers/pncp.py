@@ -1,6 +1,10 @@
 """
-Scraper para a API pública do PNCP (Portal Nacional de Contratações Públicas).
-Documentação: https://pncp.gov.br/api/pncp/v1
+Scraper para o PNCP (Portal Nacional de Contratações Públicas).
+
+NOTA: A API REST pública /v1/contratacoes/publicacoes foi descontinuada pelo PNCP.
+O módulo mantém a estrutura para quando a API for restabelecida ou migrada,
+mas retorna resultados vazios sem erro para não quebrar o fluxo de busca.
+O Claude Search (scrapers/claude_search.py) cobre o PNCP via busca web.
 """
 
 from __future__ import annotations
@@ -182,6 +186,12 @@ def buscar_e_salvar_pncp(
     data_final = hoje.strftime("%Y%m%d")
 
     logger.info(
+        "PNCP: API pública descontinuada — buscas cobertas pelo Claude Search | perfil '%s'",
+        perfil.nome,
+    )
+    return []  # API descontinuada; Claude Search cobre via web
+
+    logger.info(  # noqa: unreachable — mantido para referência futura
         "PNCP: iniciando busca para perfil '%s' | %s → %s",
         perfil.nome, data_inicial, data_final,
     )

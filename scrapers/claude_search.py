@@ -111,12 +111,18 @@ def _montar_pedido(perfil: Perfil) -> str:
     buscar = " / ".join(grupos[:4])  # exemplos para guiar
 
     return (
-        f"Hoje é {hoje}. Preciso que você encontre oportunidades ABERTAS para a Bruna.\n\n"
-        f"Sugestões de busca iniciais (adapte e crie mais conforme encontrar resultados):\n"
-        f"- {chr(10).join('  ' + g for g in grupos)}\n\n"
-        f"Faça pelo menos 12 buscas diferentes cobrindo os temas acima. "
-        f"Ao encontrar uma oportunidade interessante, verifique a página para confirmar "
-        f"o prazo antes de incluir. Ao terminar todas as buscas, retorne o JSON com as oportunidades."
+        f"Hoje é {hoje}. Encontre oportunidades ABERTAS para a Bruna.\n\n"
+        f"Faça buscas variadas cobrindo:\n"
+        f"1. site:gov.br edital consultoria 'plano de manejo' 2026\n"
+        f"2. chamada pública facilitação participativa ICMBio 2026\n"
+        f"3. edital consultoria socioambiental diagnóstico pessoa física 2026\n"
+        f"4. pncp.gov.br consultoria ambiental chamada 2026\n"
+        f"5. chamada Funbio WWF ISA parceria ambiental 2026\n"
+        f"6. edital fomento 'leis de incentivo' projetos socioambientais\n"
+        f"7. bolsa pesquisa etnoconhecimento comunidades CNPq CAPES 2026\n"
+        f"8. compras.gov.br chamada pública ambiental 2026\n\n"
+        f"Para cada resultado: verifique o prazo na página antes de incluir. "
+        f"Ao terminar, retorne o JSON com as oportunidades abertas encontradas."
     )
 
 
