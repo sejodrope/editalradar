@@ -24,12 +24,12 @@ from models import Edital, Perfil
 
 logger = logging.getLogger(__name__)
 
-# Sonnet 4.6 necessário para web search com tool calling
-# Custo: ~$0.15-0.25 por busca completa (2x/semana = ~R$10/mês total)
-# MAX_BUSCAS limitado a 8 para não exceder 30K TPM do tier básico
+# Sonnet 4.6: único modelo com suporte a web_search tool calling
+# Limites conservadores para controlar custo (lição aprendida)
 MODELO_BUSCA = "claude-sonnet-4-6"
-MAX_BUSCAS_POR_RODADA = 8
-CUSTO_POR_BUSCA_USD = 0.020               # estimativa conservadora
+MAX_BUSCAS_POR_RODADA = 4    # 4 buscas max → ~$0.50-1.00 por execução
+MAX_TOKENS_RESPOSTA   = 1500 # limite rígido de tokens na resposta
+CUSTO_POR_BUSCA_USD   = 1.50 # estimativa conservadora (inclui contexto acumulado)
 
 
 def _carregar_chave() -> Optional[str]:
@@ -239,11 +239,11 @@ def buscar_editais(db: Session, perfil: Perfil) -> list[Edital]:
         logger.error("Claude search: pip install anthropic")
         return []
 
-    # Verifica budget antes de executar
+    # ── Verificação de orçamento OBRIGATÓRIA ─────────────────────────────
     from ai.usage_tracker import pode_executar, registrar_uso
-    pode, motivo = pode_executar(MAX_BUSCAS_POR_RODADA)
+    pode, motivo = pode_executar("busca_profunda", 1)
     if not pode:
-        logger.warning("Claude search: %s", motivo)
+        logger.warning("Claude search: BLOQUEADO — %s", motivo)
         return []
 
     logger.info("Claude search: iniciando busca agentica para '%s'", perfil.nome)
@@ -256,13 +256,13 @@ def buscar_editais(db: Session, perfil: Perfil) -> list[Edital]:
         try:
             response = client.messages.create(
                 model=MODELO_BUSCA,
-                max_tokens=4000,
+                max_tokens=MAX_TOKENS_RESPOSTA,   # limite RÍGIDO anti-explosão
                 system=_montar_instrucoes(perfil),
                 tools=[
                     {
                         "type": "web_search_20260209",
                         "name": "web_search",
-                        "max_uses": MAX_BUSCAS_POR_RODADA,
+                        "max_uses": MAX_BUSCAS_POR_RODADA,   # máx 4 buscas
                     }
                 ],
                 messages=[
@@ -309,8 +309,8 @@ def buscar_editais(db: Session, perfil: Perfil) -> list[Edital]:
     oportunidades = _extrair_oportunidades(texto_final)
     salvos = _salvar_oportunidades(db, perfil, oportunidades)
 
-    # Registra uso
-    registrar_uso(max(n_buscas, 1), provedor="claude_search")
+    # Registra uso real
+    registrar_uso(1, operacao="busca_profunda", provedor="claude_search")
 
     logger.info(
         "Claude search: '%s' — %s oportunidades de %s buscas",

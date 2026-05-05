@@ -257,7 +257,7 @@ def triar_editais(
 
     # Verifica orçamento antes de começar
     from ai.usage_tracker import pode_executar, registrar_uso
-    pode, motivo = pode_executar(len(editais))
+    pode, motivo = pode_executar("triagem", len(editais))
     if not pode:
         logger.warning("Claude: budget atingido — %s", motivo)
         contadores["sem_chave"] = len(editais)
@@ -307,7 +307,7 @@ def triar_editais(
 
     # Registra uso real
     if contadores["analisados"] > 0:
-        registrar_uso(contadores["analisados"], provedor="claude")
+        registrar_uso(contadores["analisados"], operacao="triagem", provedor="claude")
 
     logger.info("Claude triagem: analisados=%s descartados=%s", contadores["analisados"], contadores["descartados"])
     return contadores

@@ -162,6 +162,37 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
+    # Painel de gastos API — visível o tempo todo para não ter surpresas
+    try:
+        from ai.usage_tracker import stats_completos, LIMITE_DIARIO_USD, LIMITE_MENSAL_USD
+        s = stats_completos()
+        dia = s["dia"]
+        mes = s["mes"]
+        cor_dia = "#00c48c" if dia["pct"] < 50 else ("#e67e22" if dia["pct"] < 80 else "#c0392b")
+        cor_mes = "#00c48c" if mes["pct"] < 50 else ("#e67e22" if mes["pct"] < 80 else "#c0392b")
+        st.markdown(
+            f'<div style="margin:6px 1rem 0;padding:8px 10px;background:rgba(255,255,255,0.03);'
+            f'border:1px solid rgba(255,255,255,0.06);border-radius:8px;font-size:0.72rem;">'
+            f'<div style="color:#2e3d52;font-weight:700;letter-spacing:0.08em;'
+            f'text-transform:uppercase;margin-bottom:5px;">Gastos API</div>'
+            f'<div style="display:flex;justify-content:space-between;margin-bottom:3px;">'
+            f'<span style="color:#3d5068;">Hoje</span>'
+            f'<span style="color:{cor_dia};font-weight:600;">R${dia["custo_brl"]:.2f} / R${LIMITE_DIARIO_USD*5.8:.0f}</span>'
+            f'</div>'
+            f'<div style="background:rgba(255,255,255,0.05);border-radius:3px;height:4px;margin-bottom:5px;overflow:hidden;">'
+            f'<div style="background:{cor_dia};height:4px;width:{min(dia["pct"],100):.0f}%;border-radius:3px;"></div></div>'
+            f'<div style="display:flex;justify-content:space-between;">'
+            f'<span style="color:#3d5068;">Mês</span>'
+            f'<span style="color:{cor_mes};font-weight:600;">R${mes["custo_brl"]:.2f} / R${LIMITE_MENSAL_USD*5.8:.0f}</span>'
+            f'</div>'
+            f'<div style="background:rgba(255,255,255,0.05);border-radius:3px;height:4px;margin-top:3px;overflow:hidden;">'
+            f'<div style="background:{cor_mes};height:4px;width:{min(mes["pct"],100):.0f}%;border-radius:3px;"></div></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass  # não quebra o app se o tracker falhar
+
     # Navegação
     st.markdown('<div class="er-section">Navegação</div>', unsafe_allow_html=True)
     paginas = ["Dashboard", "Editais", "Perfis", "Documentos", "Configurações"]
