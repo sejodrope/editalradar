@@ -268,26 +268,12 @@ def executar_busca_completa(
             logger.error("Erro PNCP '%s': %s", perfil.nome, exc)
 
     if incluir_web:
-        if claude_ok():
-            # Claude Search: agentico, preciso, verifica prazos automaticamente
-            try:
-                novos_claude = claude_buscar(db, perfil)
-                resultado["claude_search"] = len(novos_claude)
-                logger.info("Claude Search: %s oportunidades para '%s'", len(novos_claude), perfil.nome)
-            except Exception as exc:
-                logger.error("Erro Claude search '%s': %s", perfil.nome, exc)
-                # Fallback para DuckDuckGo se Claude falhar
-                try:
-                    resultado["web"] = len(buscar_e_salvar_web(db, perfil))
-                except Exception as exc2:
-                    logger.error("Erro fallback web '%s': %s", perfil.nome, exc2)
-        else:
-            # Fallback: DuckDuckGo (gratuito, menos preciso)
-            logger.info("Claude Search indisponível — usando DuckDuckGo para '%s'", perfil.nome)
-            try:
-                resultado["web"] = len(buscar_e_salvar_web(db, perfil))
-            except Exception as exc:
-                logger.error("Erro web '%s': %s", perfil.nome, exc)
+        # DuckDuckGo: busca ampla gratuita (principal)
+        # Claude Search (agentico) é caro — disponível apenas via menu manual
+        try:
+            resultado["web"] = len(buscar_e_salvar_web(db, perfil))
+        except Exception as exc:
+            logger.error("Erro web '%s': %s", perfil.nome, exc)
 
     crud.atualizar_config_busca(db, perfil.id, ultima_busca_em=datetime.now())
     total = resultado["pncp"] + resultado["web"] + resultado["claude_search"]

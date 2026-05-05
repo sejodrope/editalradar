@@ -188,15 +188,41 @@ def _render_palavras_chave(db: Session, perfil) -> None:
 
 
 def _render_acoes_perfil(db: Session, perfil) -> None:
-    col_busca, col_del = st.columns(2)
+    col_busca, col_prof, col_del = st.columns(3)
 
     with col_busca:
-        if st.button("Testar busca agora", use_container_width=True):
-            with st.spinner("Buscando..."):
+        if st.button("Busca rápida", use_container_width=True,
+                     help="DuckDuckGo gratuito + triagem Claude Haiku (~R$0,05)"):
+            with st.spinner("Buscando via DuckDuckGo..."):
                 from scrapers.web_search import executar_busca_completa
-                resultado = executar_busca_completa(db, perfil, incluir_pncp=True, incluir_web=True)
-            total = resultado.get("pncp", 0) + resultado.get("web", 0)
-            st.success(f"{total} novo(s) edital(is) — PNCP: {resultado['pncp']}, Web: {resultado['web']}")
+                resultado = executar_busca_completa(db, perfil, incluir_pncp=False, incluir_web=True)
+            total = resultado.get("web", 0)
+            st.success(f"{total} novo(s) edital(is) encontrado(s)")
+
+    with col_prof:
+        from scrapers.claude_search import esta_disponivel as claude_ok
+        if claude_ok():
+            chave_prof = f"confirm_prof_{perfil.id}"
+            if not st.session_state.get(chave_prof):
+                if st.button("Busca profunda", use_container_width=True, type="secondary",
+                             help="Claude Sonnet pesquisa na web (~$2-4 por uso)"):
+                    st.session_state[chave_prof] = True
+                    st.rerun()
+            else:
+                st.warning("Busca profunda usa Claude Sonnet (~$2-4). Confirmar?")
+                c1, c2 = st.columns(2)
+                if c1.button("Sim, buscar", key=f"prof_ok_{perfil.id}", type="primary"):
+                    st.session_state.pop(chave_prof, None)
+                    with st.spinner("Claude pesquisando na web... (pode demorar 2-3 min)"):
+                        from scrapers.claude_search import buscar_editais
+                        novos = buscar_editais(db, perfil)
+                    st.success(f"{len(novos)} oportunidade(s) encontrada(s) pelo Claude")
+                    st.rerun()
+                if c2.button("Cancelar", key=f"prof_nao_{perfil.id}"):
+                    st.session_state.pop(chave_prof, None)
+                    st.rerun()
+        else:
+            st.caption("Configure chave Claude para busca profunda")
 
     with col_del:
         chave_del = f"confirm_del_perfil_{perfil.id}"
