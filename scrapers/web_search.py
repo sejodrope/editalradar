@@ -251,9 +251,15 @@ def executar_busca_completa(
     incluir_web: bool = True,
     dias_retroativos_pncp: int = 30,
 ) -> dict[str, int]:
+    """
+    Orquestrador principal de busca.
+    Prioridade: Claude Search (agentico) > DuckDuckGo (fallback gratis)
+    PNCP sempre executa (API publica gratuita).
+    """
     from scrapers.pncp import buscar_e_salvar_pncp
+    from scrapers.claude_search import buscar_editais as claude_buscar, esta_disponivel as claude_ok
 
-    resultado = {"pncp": 0, "web": 0}
+    resultado = {"pncp": 0, "web": 0, "claude_search": 0}
 
     if incluir_pncp:
         try:
@@ -262,11 +268,31 @@ def executar_busca_completa(
             logger.error("Erro PNCP '%s': %s", perfil.nome, exc)
 
     if incluir_web:
-        try:
-            resultado["web"] = len(buscar_e_salvar_web(db, perfil))
-        except Exception as exc:
-            logger.error("Erro web '%s': %s", perfil.nome, exc)
+        if claude_ok():
+            # Claude Search: agentico, preciso, verifica prazos automaticamente
+            try:
+                novos_claude = claude_buscar(db, perfil)
+                resultado["claude_search"] = len(novos_claude)
+                logger.info("Claude Search: %s oportunidades para '%s'", len(novos_claude), perfil.nome)
+            except Exception as exc:
+                logger.error("Erro Claude search '%s': %s", perfil.nome, exc)
+                # Fallback para DuckDuckGo se Claude falhar
+                try:
+                    resultado["web"] = len(buscar_e_salvar_web(db, perfil))
+                except Exception as exc2:
+                    logger.error("Erro fallback web '%s': %s", perfil.nome, exc2)
+        else:
+            # Fallback: DuckDuckGo (gratuito, menos preciso)
+            logger.info("Claude Search indisponível — usando DuckDuckGo para '%s'", perfil.nome)
+            try:
+                resultado["web"] = len(buscar_e_salvar_web(db, perfil))
+            except Exception as exc:
+                logger.error("Erro web '%s': %s", perfil.nome, exc)
 
     crud.atualizar_config_busca(db, perfil.id, ultima_busca_em=datetime.now())
-    logger.info("Busca completa '%s': pncp=%s web=%s", perfil.nome, resultado["pncp"], resultado["web"])
+    total = resultado["pncp"] + resultado["web"] + resultado["claude_search"]
+    logger.info(
+        "Busca completa '%s': pncp=%s claude_search=%s ddg=%s total=%s",
+        perfil.nome, resultado["pncp"], resultado["claude_search"], resultado["web"], total,
+    )
     return resultado
