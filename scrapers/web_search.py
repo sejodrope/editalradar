@@ -1,6 +1,14 @@
 """
-Scraper de editais via busca web (ddgs / duckduckgo_search).
-Queries focadas em oportunidades ABERTAS para consultora ambiental solo/MEI.
+Scraper de editais via busca web — queries cirúrgicas para a Bruna.
+
+Foco exclusivo em:
+- Termos de referência, manifestações de interesse, contratação de consultor individual
+- Temas: povos e comunidades tradicionais, sociobiodiversidade, bioeconomia,
+  CLPI, restauração da vegetação, facilitação/moderação participativa,
+  sistematização, análise qualitativa, entrevistas semiestruturadas
+
+NÃO busca: programas de extensão universitária, bolsas de pós-graduação,
+vagas de emprego CLT, fornecimento de materiais/equipamentos.
 """
 
 from __future__ import annotations
@@ -19,85 +27,74 @@ from models import Edital, Perfil
 
 logger = logging.getLogger(__name__)
 
-MAX_RESULTS_POR_QUERY = 10
+MAX_RESULTS_POR_QUERY = 8   # reduzido: qualidade > quantidade
 PAUSA_ENTRE_QUERIES = 1.5
-MAX_QUERIES_POR_PERFIL = 20
+MAX_QUERIES_POR_PERFIL = 14  # menos queries, mas mais cirúrgicas
 
-_TERMOS_EDITAL = {
-    "edital", "chamada", "fomento", "licitação", "concurso", "seleção",
-    "convocação", "pregão", "inscrição", "bolsa", "financiamento",
-    "subvenção", "grant", "proposta", "candidatura", "parceria",
-    "contratação", "assessoria", "consultoria", "termo de referência", "tdr",
+# Termos que PRECISAM estar no conteúdo para considerar relevante
+_TERMOS_DOCUMENTO = {
+    "termo de referência", "tdr", "manifestação de interesse",
+    "contratação", "consultoria", "consultor", "chamada", "edital",
+    "seleção", "proposta", "candidatura",
+}
+
+# Termos que IMEDIATAMENTE descartam o resultado
+_TERMOS_EXCLUIR = {
+    "extensão universitária", "programa de extensão", "pós-graduação",
+    "mestrado", "doutorado", "vagas de emprego", "concurso público",
+    "clt", "carteira assinada", "pregão eletrônico para aquisição",
+    "licitação de materiais", "fornecimento de equipamentos",
 }
 
 _DOMINIOS_BLOQUEADOS = {
     "youtube.com", "facebook.com", "twitter.com", "instagram.com",
-    "linkedin.com", "wikipedia.org", "reddit.com",
-    "microsoft.com", "stackoverflow.com", "github.com",
-    "amazon.com", "mercadolivre.com",
+    "linkedin.com", "wikipedia.org", "reddit.com", "stackoverflow.com",
+    "amazon.com", "mercadolivre.com", "indeed.com", "catho.com",
 }
 
-# Portais prioritários onde as oportunidades da Bruna realmente aparecem
-_PORTAIS_ALTA_PRIORIDADE = [
-    # ONGs ambientais
+# Portais onde as oportunidades da Bruna realmente aparecem
+_PORTAIS = [
     ("funbio.org.br",       "Funbio"),
     ("cepf.net",            "CEPF"),
-    ("wwf.org.br",          "WWF"),
     ("ipe.org.br",          "IPÊ"),
-    ("iis-rio.org",         "IIS"),
     ("imazon.org.br",       "Imazon"),
-    ("imaflora.org",        "Imaflora"),
     ("socioambiental.org",  "ISA"),
-    ("ci.org.br",           "Conservation International"),
-    ("aliancadaterra.org.br","Aliança da Terra"),
+    ("iis-rio.org",         "IIS"),
+    ("imaflora.org",        "Imaflora"),
     ("ispn.org.br",         "ISPN"),
-    # Governamentais
+    ("aliancadaterra.org.br", "Aliança da Terra"),
+    ("wwf.org.br",          "WWF"),
+    ("ci.org.br",           "Conservation International"),
     ("icmbio.gov.br",       "ICMBio"),
     ("mma.gov.br",          "MMA"),
-    ("funai.gov.br",        "FUNAI"),
 ]
 
 
 def _gerar_queries(perfil: Perfil) -> list[str]:
-    """Gera queries variadas cobrindo todas as especialidades da Bruna."""
+    """
+    Queries cirúrgicas focadas nos instrumentos exatos que a Bruna executa.
+    Menos queries, mais precisas = menos triagem, menos custo.
+    """
     ano = datetime.now().year
-    palavras = perfil.palavras_chave or []
-    queries: list[str] = []
+    excluir = '-"extensão universitária" -"pós-graduação" -"concurso público"'
+    queries = []
 
-    # ── 1. Portais especializados (maior qualidade) ────────────────────────
-    for dominio, _ in _PORTAIS_ALTA_PRIORIDADE[:8]:
-        queries.append(f"site:{dominio} chamada consultoria {ano}")
+    # ── Grupo 1: Portais especializados (mais qualidade) ──────────────────
+    for dominio, _ in _PORTAIS[:6]:
+        queries.append(f'site:{dominio} "termo de referência" OR "manifestação de interesse" {ano}')
 
-    # ── 2. Queries por especialidades-chave da Bruna ──────────────────────
-    especialidades_core = [
-        ("plano de manejo",              f'"plano de manejo" consultoria "inscrições abertas" {ano}'),
-        ("facilitação participativa",    f'"facilitação participativa" chamada consultoria {ano} site:gov.br'),
-        ("programa de comunicação social", f'"programa de comunicação social" consultoria "pessoa física" {ano}'),
-        ("diagnóstico socioeconômico",   f'"diagnóstico socioeconômico" consultoria edital {ano}'),
-        ("etnoconhecimento",             f'"etnoconhecimento" chamada pesquisa bolsa {ano}'),
-        ("sociobiodiversidade",          f'"sociobiodiversidade" consultoria chamada {ano}'),
-        ("povos e comunidades",          f'"comunidades tradicionais" consultoria edital "pessoa física" {ano}'),
+    # ── Grupo 2: Documentos específicos por tema ──────────────────────────
+    temas_queries = [
+        f'"termo de referência" "comunidades tradicionais" consultoria {ano} {excluir}',
+        f'"manifestação de interesse" sociobiodiversidade bioeconomia {ano}',
+        f'"contratação consultor" "consulta prévia" OR "CLPI" OR "restauração" {ano} site:gov.br',
+        f'"facilitação" OR "moderação" oficinas participativas consultoria {ano} {excluir}',
+        f'"sistematização" OR "análise qualitativa" consultoria ambiental {ano} site:gov.br',
+        f'PNUD GEF "consultor individual" socioambiental {ano} site:gov.br',
+        f'"bioeconomia" "comunidades tradicionais" consultoria {ano}',
+        f'ICMBio "plano de manejo" "manifestação de interesse" {ano}',
     ]
-    for _, query in especialidades_core:
-        queries.append(query)
-        if len(queries) >= MAX_QUERIES_POR_PERFIL:
-            break
-
-    # ── 3. Queries PNUD/GEF/ICMBio (projetos recorrentes onde ela trabalha) ──
-    queries.append(f"PNUD MMA consultoria socioambiental edital {ano} site:gov.br")
-    queries.append(f"GEF Brasil consultoria ambiental chamada {ano}")
-    queries.append(f"site:icmbio.gov.br consultoria edital {ano}")
-
-    # ── 4. Queries por fontes priorizadas do perfil ────────────────────────
-    fontes = perfil.fontes_priorizadas or []
-    if "BNDES" in fontes:
-        queries.append(f"site:bndes.gov.br chamada consultoria socioambiental {ano}")
-    if "FINEP" in fontes:
-        queries.append(f"site:finep.gov.br chamada consultoria ambiental {ano}")
-
-    # ── 5. Queries gerais com foco em abertas ────────────────────────────
-    queries.append(f'consultoria socioambiental "pessoa física" edital "inscrições abertas" {ano}')
-    queries.append(f'"termo de referência" consultoria ambiental {ano} site:gov.br')
+    queries.extend(temas_queries)
 
     return queries[:MAX_QUERIES_POR_PERFIL]
 
@@ -117,36 +114,47 @@ def _url_valida(url: str) -> bool:
     return not any(b in d for b in _DOMINIOS_BLOQUEADOS)
 
 
-def _e_relevante_para_edital(title: str, body: str) -> bool:
+def _e_relevante(title: str, body: str, url: str) -> bool:
+    """Filtra em 3 camadas antes de gastar com Claude."""
     texto = (title + " " + body).lower()
-    if not any(termo in texto for termo in _TERMOS_EDITAL):
+    url_lower = url.lower()
+
+    # Camada 1: Descarta se tem termos de exclusão
+    if any(t in texto for t in _TERMOS_EXCLUIR):
         return False
-    # Descarta conteúdo com datas claramente velhas
+
+    # Camada 2: Precisa ter pelo menos um termo de documento relevante
+    if not any(t in texto for t in _TERMOS_DOCUMENTO):
+        return False
+
+    # Camada 3: Descarta conteúdo com datas velhas (2020-2024)
     ano_atual = datetime.now().year
-    for ano in range(2020, ano_atual - 1):  # 2020..ano-2
-        if re.search(rf'\b{ano}\b', texto):
+    for ano in range(2020, ano_atual - 1):
+        # Checa no texto E na URL
+        if re.search(rf'\b{ano}\b', texto) or f'/{ano}/' in url_lower:
             return False
+
     return True
 
 
 def _inferir_fonte(url: str) -> str:
     d = _dominio(url).lower()
-    for dominio, nome in _PORTAIS_ALTA_PRIORIDADE:
+    for dominio, nome in _PORTAIS:
         if dominio in d:
             return nome
     if "gov.br" in d:
         return "Gov.br"
-    return "DuckDuckGo"
+    return "Web"
 
 
-def _normalizar_resultado(resultado: dict) -> Optional[dict]:
+def _normalizar(resultado: dict) -> Optional[dict]:
     url   = resultado.get("href") or resultado.get("url") or ""
     title = resultado.get("title") or ""
     body  = resultado.get("body") or ""
 
     if not _url_valida(url):
         return None
-    if not _e_relevante_para_edital(title, body):
+    if not _e_relevante(title, body, url):
         return None
 
     titulo = (title or body[:200]).strip()[:500]
@@ -155,7 +163,7 @@ def _normalizar_resultado(resultado: dict) -> Optional[dict]:
 
     return {
         "titulo": titulo,
-        "descricao_curta": body[:1000] if body else None,
+        "descricao_curta": body[:800] if body else None,
         "fonte": _inferir_fonte(url),
         "url_original": url[:2000],
         "orgao_publicador": _dominio(url)[:300],
@@ -163,7 +171,7 @@ def _normalizar_resultado(resultado: dict) -> Optional[dict]:
 
 
 def buscar_e_salvar_web(db: Session, perfil: Perfil) -> list[Edital]:
-    """Busca com queries especializadas para o perfil da Bruna."""
+    """Busca com queries cirúrgicas — qualidade > volume."""
     DDGS = None
     for pkg, cls in [("ddgs", "DDGS"), ("duckduckgo_search", "DDGS")]:
         try:
@@ -177,11 +185,8 @@ def buscar_e_salvar_web(db: Session, perfil: Perfil) -> list[Edital]:
         logger.error("Instale: pip install ddgs")
         return []
 
-    if not perfil.palavras_chave:
-        return []
-
     queries = _gerar_queries(perfil)
-    logger.info("WebSearch: %s queries para '%s'", len(queries), perfil.nome)
+    logger.info("WebSearch: %s queries cirúrgicas para '%s'", len(queries), perfil.nome)
 
     novos: list[Edital] = []
     urls_vistas: set[str] = set()
@@ -192,24 +197,29 @@ def buscar_e_salvar_web(db: Session, perfil: Perfil) -> list[Edital]:
                 try:
                     res = ddgs.text(query, max_results=MAX_RESULTS_POR_QUERY)
                 except Exception as exc:
-                    logger.warning("WebSearch erro query '%s': %s", query[:60], exc)
+                    logger.warning("WebSearch query erro: %s", exc)
                     time.sleep(PAUSA_ENTRE_QUERIES * 2)
                     continue
 
+                para_salvar = []
                 for r in (res or []):
-                    campos = _normalizar_resultado(r)
+                    campos = _normalizar(r)
                     if campos is None:
                         continue
                     url = campos["url_original"]
                     if url in urls_vistas or crud.edital_existe_por_url(db, url, perfil.id):
                         continue
                     urls_vistas.add(url)
-                    try:
-                        edital = crud.criar_edital(db, perfil_id=perfil.id, **campos)
-                        novos.append(edital)
-                        logger.info("WebSearch: id=%s '%s'", edital.id, edital.titulo[:55])
-                    except Exception as exc:
-                        logger.error("WebSearch salvar: %s", exc)
+                    para_salvar.append(campos)
+
+                if para_salvar:
+                    logger.info("Query %s/%s: %s resultados válidos", i+1, len(queries), len(para_salvar))
+                    for campos in para_salvar:
+                        try:
+                            edital = crud.criar_edital(db, perfil_id=perfil.id, **campos)
+                            novos.append(edital)
+                        except Exception as exc:
+                            logger.error("Salvar erro: %s", exc)
 
                 time.sleep(PAUSA_ENTRE_QUERIES)
 
@@ -228,7 +238,6 @@ def executar_busca_completa(
     dias_retroativos_pncp: int = 30,
 ) -> dict[str, int]:
     from scrapers.pncp import buscar_e_salvar_pncp
-    from scrapers.claude_search import buscar_editais as claude_buscar, esta_disponivel as claude_ok
 
     resultado = {"pncp": 0, "web": 0, "claude_search": 0}
 
@@ -236,15 +245,14 @@ def executar_busca_completa(
         try:
             resultado["pncp"] = len(buscar_e_salvar_pncp(db, perfil, dias_retroativos=dias_retroativos_pncp))
         except Exception as exc:
-            logger.error("Erro PNCP '%s': %s", perfil.nome, exc)
+            logger.error("Erro PNCP: %s", exc)
 
     if incluir_web:
         try:
             resultado["web"] = len(buscar_e_salvar_web(db, perfil))
         except Exception as exc:
-            logger.error("Erro web '%s': %s", perfil.nome, exc)
+            logger.error("Erro web: %s", exc)
 
     crud.atualizar_config_busca(db, perfil.id, ultima_busca_em=datetime.now())
-    total = sum(resultado.values())
     logger.info("Busca completa '%s': %s", perfil.nome, resultado)
     return resultado
