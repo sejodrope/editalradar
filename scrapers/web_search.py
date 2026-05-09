@@ -125,7 +125,18 @@ def _url_valida(url: str) -> bool:
 
 def _e_relevante_para_edital(title: str, body: str) -> bool:
     texto = (title + " " + body).lower()
-    return any(termo in texto for termo in _TERMOS_EDITAL)
+    if not any(termo in texto for termo in _TERMOS_EDITAL):
+        return False
+    # Descarta conteúdo claramente de anos anteriores
+    ano_atual = datetime.now().year
+    anos_velhos = [str(a) for a in range(2020, ano_atual - 1)]  # 2020..ano-2
+    for ano in anos_velhos:
+        if f"/{ano}" in texto or f" {ano}" in texto or f"-{ano}" in texto:
+            # Só descarta se o ano velho aparece como data (não como número aleatório)
+            import re
+            if re.search(rf'\b{ano}\b', texto):
+                return False
+    return True
 
 
 def _inferir_fonte(url: str) -> str:

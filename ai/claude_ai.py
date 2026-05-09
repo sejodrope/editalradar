@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -109,21 +110,26 @@ def _montar_prompt_usuario(edital: Edital, perfil: Perfil) -> str:
     area = perfil.area_atuacao or perfil.nome or "consultoria ambiental"
     valor = f"R$ {edital.valor_total:,.0f}".replace(",", ".") if edital.valor_total else "não informado"
 
+    ano_atual = datetime.now().year
     return (
+        f"ATENÇÃO: Hoje é {datetime.now().strftime('%d/%m/%Y')}. "
+        f"Só aceite editais com prazo de inscrição EM ABERTO (prazo futuro). "
+        f"Se o edital for de 2023, 2024 ou antes, ou se o prazo já passou, dê relevancia=0.\n\n"
         f"Avalie esta oportunidade para uma consultora de '{area}' "
         f"especializada em: {palavras}.\n\n"
         f"Título: {edital.titulo}\n"
         f"Órgão: {edital.orgao_publicador or 'não informado'}\n"
-        f"Modalidade: {edital.modalidade or 'não informada'}\n"
         f"Valor estimado: {valor}\n"
-        f"Descrição: {descricao}\n\n"
-        "Responda com JSON no formato exato abaixo:\n"
+        f"Descrição/Conteúdo:\n{descricao}\n\n"
+        f"REGRAS:\n"
+        f"- Se mencionar datas de 2023 ou 2024 como prazo → relevancia=0, alerta='Edital encerrado'\n"
+        f"- Se não conseguir confirmar que o prazo é futuro ({ano_atual}) → relevancia máx 40\n"
+        f"- Se claramente aberto em {ano_atual} → avalie normalmente\n\n"
+        "Responda com JSON:\n"
         '{"relevancia":0,"adequado_solo":true,"tipo":"consultoria",'
-        '"alerta":"","motivo":"1 frase","requisitos_chave":"resumo do que exige",'
-        '"tags":["tag1"],"resumo_curto":"até 150 chars"}\n\n'
-        "tipo: consultoria | parceria | fomento | projeto_tecnico | capacitacao | licitacao_compra | outro\n"
-        "alerta: motivo se NÃO adequado para solo, vazio string se adequado\n"
-        "requisitos_chave: o que precisaria apresentar para concorrer (documentos, experiência, etc)"
+        '"alerta":"","motivo":"1 frase","requisitos_chave":"o que exige",'
+        '"tags":["tag1"],"resumo_curto":"até 150 chars"}\n'
+        "tipo: consultoria|parceria|fomento|projeto_tecnico|capacitacao|licitacao_compra|outro"
     )
 
 
