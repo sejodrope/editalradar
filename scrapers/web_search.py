@@ -67,33 +67,39 @@ def _gerar_queries(perfil: Perfil) -> list[str]:
     fontes = perfil.fontes_priorizadas or []
     queries: list[str] = []
 
-    for kw in palavras:
-        # Foco em EDITAIS ABERTOS — "inscrições abertas" filtra artigos de notícia
-        queries.append(f'"{kw}" edital "inscrições abertas" {ano} site:gov.br')
-        queries.append(f'"{kw}" chamada pública "prazo" consultoria pessoa física {ano}')
+    # Portais específicos onde oportunidades da Bruna realmente aparecem
+    portais_ong = [
+        "funbio.org.br",       # Fundo Brasileiro para Biodiversidade
+        "cepf.net",            # Critical Ecosystem Partnership Fund
+        "wwf.org.br",          # WWF Brasil
+        "ipe.org.br",          # Instituto de Pesquisas Ecológicas
+        "iis-rio.org",         # Instituto Internacional para Sustentabilidade
+        "imazon.org.br",       # Imazon
+        "imaflora.org",        # Instituto de Manejo e Certificação Florestal e Agrícola
+        "socioambiental.org",  # Instituto Socioambiental (ISA)
+    ]
 
-        # Parcerias e ONGs com chamadas ativas
-        queries.append(f'"{kw}" chamada projetos ONG fundação "aberto" {ano}')
+    # Queries nos portais de ONGs/fundações (alta precisão)
+    for portal in portais_ong[:6]:
+        queries.append(f'site:{portal} chamada consultoria {ano}')
+        if len(queries) >= 6:
+            break
 
-        # Elaboração de planos — trabalho típico de consultora
-        queries.append(f'"elaboração" "{kw}" chamada "consultoria" site:gov.br {ano}')
+    # Queries em portais governamentais com chamadas abertas
+    queries.append(f'site:icmbio.gov.br edital consultoria "plano de manejo" {ano}')
+    queries.append(f'site:mma.gov.br chamada pública consultoria socioambiental {ano}')
+    queries.append(f'site:gov.br "chamada pública" "plano de manejo" consultoria {ano}')
 
-        # Por fonte específica com foco em chamadas abertas
-        for fonte in fontes:
-            if fonte == "BNDES":
-                queries.append(f'site:bndes.gov.br chamada "{kw}" {ano}')
-            elif fonte == "FINEP":
-                queries.append(f'site:finep.gov.br chamada "{kw}" {ano}')
-            elif fonte == "MMA":
-                queries.append(f'site:gov.br MMA edital "{kw}" {ano}')
-
+    # Queries por palavra-chave com foco em chamadas abertas
+    for kw in palavras[:3]:
+        queries.append(f'"{kw}" chamada "consultoria" "inscrições abertas" {ano}')
+        queries.append(f'"{kw}" edital pessoa física "prazo" consultoria {ano}')
         if len(queries) >= MAX_QUERIES_POR_PERFIL:
             break
 
-    # Queries gerais específicas para consultora solo
-    area = perfil.area_atuacao or "ambiental"
-    queries.append(f'edital "pessoa física" consultoria {area} "inscrições" {ano}')
-    queries.append(f'"chamada pública" consultoria socioambiental MEI {ano} aberto')
+    # Query PNUD/GEF (projetos recorrentes perfeitos para a Bruna)
+    queries.append(f'PNUD MMA consultoria "plano de manejo" edital {ano} site:gov.br')
+    queries.append(f'GEF consultoria socioambiental chamada {ano} Brasil')
 
     return queries[:MAX_QUERIES_POR_PERFIL]
 
