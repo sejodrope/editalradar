@@ -68,35 +68,32 @@ def _gerar_queries(perfil: Perfil) -> list[str]:
     queries: list[str] = []
 
     for kw in palavras:
-        # Alta precisão: gov.br + keyword + termos de consultoria individual
-        queries.append(f'consultoria "{kw}" pessoa física edital {ano} site:gov.br')
-        queries.append(f'chamada pública "{kw}" fomento individual {ano}')
+        # Foco em EDITAIS ABERTOS — "inscrições abertas" filtra artigos de notícia
+        queries.append(f'"{kw}" edital "inscrições abertas" {ano} site:gov.br')
+        queries.append(f'"{kw}" chamada pública "prazo" consultoria pessoa física {ano}')
 
-        # Parcerias e ONGs — muito relevante para consultora solo
-        queries.append(f'"{kw}" parceria ONG consultoria ambiental edital {ano}')
-        queries.append(f'"{kw}" chamada projetos fundação {ano}')
+        # Parcerias e ONGs com chamadas ativas
+        queries.append(f'"{kw}" chamada projetos ONG fundação "aberto" {ano}')
 
-        # Elaboração de planos técnicos — trabalho típico de consultora
-        queries.append(f'"{kw}" elaboração plano técnico chamada {ano} site:gov.br')
+        # Elaboração de planos — trabalho típico de consultora
+        queries.append(f'"elaboração" "{kw}" chamada "consultoria" site:gov.br {ano}')
 
-        # Por fonte específica
+        # Por fonte específica com foco em chamadas abertas
         for fonte in fontes:
             if fonte == "BNDES":
-                queries.append(f'"{kw}" BNDES chamada consultoria {ano}')
+                queries.append(f'site:bndes.gov.br chamada "{kw}" {ano}')
             elif fonte == "FINEP":
-                queries.append(f'"{kw}" FINEP chamada pesquisador {ano}')
+                queries.append(f'site:finep.gov.br chamada "{kw}" {ano}')
             elif fonte == "MMA":
-                queries.append(f'"{kw}" MMA chamada ambiental {ano}')
-            elif fonte == "MCTI":
-                queries.append(f'"{kw}" MCTI pesquisa ambiental edital {ano}')
+                queries.append(f'site:gov.br MMA edital "{kw}" {ano}')
 
         if len(queries) >= MAX_QUERIES_POR_PERFIL:
             break
 
-    # Queries gerais para capturar oportunidades da área sem keyword específica
+    # Queries gerais específicas para consultora solo
     area = perfil.area_atuacao or "ambiental"
-    queries.append(f'consultoria {area} MEI chamada pública {ano}')
-    queries.append(f'edital assessoria técnica {area} pessoa física {ano}')
+    queries.append(f'edital "pessoa física" consultoria {area} "inscrições" {ano}')
+    queries.append(f'"chamada pública" consultoria socioambiental MEI {ano} aberto')
 
     return queries[:MAX_QUERIES_POR_PERFIL]
 
